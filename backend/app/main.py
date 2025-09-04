@@ -30,6 +30,10 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_tavily import TavilySearch
 
+# LangSmith imports for enhanced observability
+from langsmith import traceable
+from langsmith.wrappers import wrap_openai
+
 # Environment and utilities
 from dotenv import load_dotenv
 import chromadb
@@ -118,6 +122,8 @@ class AuditLogEntry(BaseModel):
     query: str
     tool_used: Optional[str]
     result: str
+    langsmith_trace_id: Optional[str] = Field(default=None, description="LangSmith trace ID for observability")
+    langsmith_project: Optional[str] = Field(default=None, description="LangSmith project name")
     
 # ========================
 # RBAC AND SECURITY
@@ -343,7 +349,8 @@ def log_dlp_event(user_role: str, data_types: list, context: str):
             action="dlp_masking_applied",
             tool_used="dlp_system",
             query=context[:50] + "..." if len(context) > 50 else context,
-            result=f"Masked {len(data_types)} sensitive data types: {', '.join(set([d['type'] for d in data_types]))}"
+            result=f"Masked {len(data_types)} sensitive data types: {', '.join(set([d['type'] for d in data_types]))}",
+            langsmith_project=os.getenv("LANGSMITH_PROJECT", "security-assistant") if os.getenv("LANGSMITH_TRACING", "false").lower() == "true" else None
         )
         audit_log.append(dlp_entry)
         logger.info(f"DLP: Masked sensitive data for {user_role}: {[d['type'] for d in data_types]}")
@@ -579,8 +586,8 @@ class SecurityDecisionTracker:
 # Global transparency tracker
 transparency_tracker = SecurityDecisionTracker()
 
-def log_audit_entry(user_role: str, action: str, query: str, tool_used: str = None, result: str = ""):
-    """Log action for audit purposes with DLP masking"""
+def log_audit_entry(user_role: str, action: str, query: str, tool_used: str = None, result: str = "", trace_id: str = None):
+    """Log action for audit purposes with DLP masking and LangSmith integration"""
     # Apply DLP masking to query and result
     masked_query, query_dlp_patterns = mask_sensitive_data(query, user_role)
     masked_result, result_dlp_patterns = mask_sensitive_data(result, user_role)
@@ -590,24 +597,34 @@ def log_audit_entry(user_role: str, action: str, query: str, tool_used: str = No
     if all_dlp_patterns:
         log_dlp_event(user_role, all_dlp_patterns, f"Query: {query[:50]}, Result: {result[:50]}")
     
-    # Create audit entry with masked data
+    # Get LangSmith information if available
+    langsmith_project = os.getenv("LANGSMITH_PROJECT", "security-assistant") if os.getenv("LANGSMITH_TRACING", "false").lower() == "true" else None
+    
+    # Create audit entry with masked data and LangSmith trace info
     entry = AuditLogEntry(
         timestamp=datetime.now(),
         user_role=user_role,
         action=action,
         query=masked_query,
         tool_used=tool_used,
-        result=masked_result[:200] + "..." if len(masked_result) > 200 else masked_result
+        result=masked_result[:200] + "..." if len(masked_result) > 200 else masked_result,
+        langsmith_trace_id=trace_id,
+        langsmith_project=langsmith_project
     )
     audit_log.append(entry)
-    logger.info(f"AUDIT: {user_role} - {action} - {tool_used}")
+    
+    # Enhanced logging with LangSmith info
+    log_msg = f"AUDIT: {user_role} - {action} - {tool_used}"
+    if trace_id:
+        log_msg += f" - Trace: {trace_id}"
+    logger.info(log_msg)
 
 # ========================
 # DOCUMENT PROCESSING & CHROMADB
 # ========================
 
 def initialize_embeddings_and_llm():
-    """Initialize OpenAI embeddings and LLM"""
+    """Initialize OpenAI embeddings and LLM with LangSmith tracing"""
     global embeddings, llm
     
     openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -621,16 +638,38 @@ def initialize_embeddings_and_llm():
     else:
         logger.warning("TAVILY_API_KEY not set - web search capabilities disabled")
     
+    # Check for LangSmith configuration
+    langsmith_tracing = os.getenv("LANGSMITH_TRACING", "false").lower() == "true"
+    langsmith_api_key = os.getenv("LANGSMITH_API_KEY")
+    if langsmith_tracing and langsmith_api_key:
+        logger.info("LangSmith tracing enabled - enhanced observability active")
+        os.environ["LANGSMITH_TRACING"] = "true"
+        os.environ["LANGSMITH_PROJECT"] = os.getenv("LANGSMITH_PROJECT", "security-assistant")
+    else:
+        logger.info("LangSmith tracing disabled or API key not provided")
+    
     embeddings = OpenAIEmbeddings(
         model="text-embedding-3-small",
         openai_api_key=openai_api_key
     )
     
-    llm = ChatOpenAI(
-        model="gpt-4o-mini",
-        temperature=0.1,
-        openai_api_key=openai_api_key
-    )
+    # Use LangSmith wrapped OpenAI client if tracing is enabled
+    if langsmith_tracing and langsmith_api_key:
+        from openai import OpenAI
+        openai_client = wrap_openai(OpenAI(api_key=openai_api_key))
+        llm = ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0.1,
+            openai_api_key=openai_api_key
+        )
+        logger.info("OpenAI LLM initialized with LangSmith tracing")
+    else:
+        llm = ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0.1,
+            openai_api_key=openai_api_key
+        )
+        logger.info("OpenAI LLM initialized without LangSmith tracing")
     
     logger.info("OpenAI embeddings and LLM initialized")
 
@@ -761,6 +800,7 @@ class PolicySearchTool(BaseTool):
     name: str = "policy_search"
     description: str = "Search security policies and handbooks. Use this when users ask about security procedures, policies, or general guidance."
     
+    @traceable(name="policy_search_tool")
     def _run(self, query: str, user_role: str = "sales") -> str:
         """Search for relevant policy documents"""
         global transparency_tracker
@@ -811,6 +851,7 @@ class LogQueryTool(BaseTool):
     name: str = "log_query" 
     description: str = "Query security logs to find login attempts, security events, and user activities. Use this when users ask about log analysis or security events."
     
+    @traceable(name="log_query_tool")
     def _run(self, query: str, user_role: str = "sales") -> str:
         """Query security logs with role-based filtering"""
         try:
@@ -886,6 +927,7 @@ class WebSearchTool(BaseTool):
     name: str = "web_search"
     description: str = "Search the web for real-time information on any topic including threat intelligence, security news, CVE vulnerabilities, cybersecurity trends, business information, and general knowledge. Use this when users need current, up-to-date information from the internet."
     
+    @traceable(name="web_search_tool")
     def _run(self, query: str, user_role: str = "security") -> str:
         """Search the web for real-time information on any topic"""
         try:
@@ -961,6 +1003,7 @@ class WebSearchTool(BaseTool):
 # AGENT SETUP
 # ========================
 
+@traceable(name="create_security_agent")
 def create_security_agent(web_search_enabled: bool = True):
     """Create LangChain agent with security tools and persistent memory"""
     
@@ -1025,6 +1068,12 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
+    langsmith_status = {
+        "enabled": os.getenv("LANGSMITH_TRACING", "false").lower() == "true",
+        "api_key_configured": bool(os.getenv("LANGSMITH_API_KEY")),
+        "project": os.getenv("LANGSMITH_PROJECT", "security-assistant")
+    }
+    
     return {
         "status": "healthy",
         "timestamp": datetime.now(),
@@ -1032,11 +1081,13 @@ async def health_check():
             "llm": llm is not None,
             "embeddings": embeddings is not None,
             "vector_store": vector_store is not None,
-            "rbac_config": bool(rbac_config)
+            "rbac_config": bool(rbac_config),
+            "langsmith": langsmith_status
         }
     }
 
 @app.post("/chat", response_model=ChatResponse)
+@traceable(name="security_assistant_chat")
 async def chat_endpoint(request: ChatRequest):
     """Main chat endpoint with AI assistant"""
     

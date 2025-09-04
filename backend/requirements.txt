@@ -12,6 +12,7 @@ langgraph>=0.2.45
 langchain-chroma>=0.1.4
 langchain-tavily>=0.2.11
 langgraph-checkpoint-sqlite>=2.0.2
+langsmith>=0.1.147
 
 # Vector database and embeddings
 chromadb>=0.5.23

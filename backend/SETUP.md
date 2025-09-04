@@ -10,7 +10,10 @@
 2. **Add your API keys** to the .env file:
    ```
    OPENAI_API_KEY=sk-your-actual-openai-api-key-here
-   TAVILY_API_KEY=tvly-your-tavily-api-key-here  # Optional for web search
+   TAVILY_API_KEY=tvly-your-tavily-api-key-here         # Optional for web search
+   LANGSMITH_API_KEY=lsv2_your-langsmith-api-key-here   # Optional for observability
+   LANGSMITH_TRACING=true                               # Enable LangSmith tracing
+   LANGSMITH_PROJECT=security-assistant                 # LangSmith project name
    ```
 
 3. **Run the backend**:
@@ -45,9 +48,16 @@
 
 4. **API Endpoints**:
    - `/chat`: Main chat interface with AI assistant
-   - `/health`: Health check
-   - `/audit-logs`: View audit logs (security role only)
+   - `/health`: Health check with LangSmith integration status
+   - `/audit-logs`: View audit logs with LangSmith trace IDs (security role only)
    - `/available-documents`: List accessible documents by role
+
+5. **Enhanced Observability with LangSmith** (Optional):
+   - **Full LLM Call Tracing**: Complete visibility into every AI interaction
+   - **Performance Monitoring**: Latency, token usage, and cost tracking
+   - **Error Debugging**: Detailed trace analysis for troubleshooting
+   - **Audit Integration**: Trace IDs linked to audit logs for complete accountability
+   - **Production Monitoring**: Real-time dashboards and alerting
 
 ### Role-Based Access:
 
@@ -61,6 +71,34 @@
 - Can only see sales/marketing department logs
 - Limited to low/medium risk events
 - Cannot access incident_escalation.md
+
+## LangSmith Setup (Optional - For Enhanced Observability)
+
+To enable LangSmith tracing for production-grade observability:
+
+1. **Sign up for LangSmith**: Visit https://smith.langchain.com/
+2. **Create an API key**: Go to Settings → API Keys → Create API Key
+3. **Add to .env file**:
+   ```
+   LANGSMITH_TRACING=true
+   LANGSMITH_API_KEY=lsv2_your-actual-langsmith-api-key
+   LANGSMITH_PROJECT=security-assistant
+   ```
+4. **Restart the backend** to enable tracing
+
+### LangSmith Benefits:
+- **Complete Trace Visibility**: See every step of LLM processing
+- **Performance Analytics**: Monitor latency, costs, and token usage  
+- **Error Debugging**: Detailed analysis of failures and edge cases
+- **Audit Enhancement**: Trace IDs automatically linked to audit logs
+- **Production Monitoring**: Real-time dashboards and automated alerts
+
+### Without LangSmith:
+The application works perfectly without LangSmith - you'll still have:
+- ✅ Basic audit logging with DLP masking
+- ✅ Security transparency explanations
+- ✅ Role-based access control
+- ✅ All core functionality
 
 ## Test Your Setup
 
@@ -92,7 +130,43 @@ curl -X POST "http://localhost:8000/chat" \
 ```
 
 The AI assistant will automatically:
-1. Decide which tool to use (policy search vs log query)
-2. Filter results based on user role
-3. Provide relevant, role-appropriate responses
-4. Log all actions for audit purposes
+1. Decide which tool to use (policy search, log query, or web search)
+2. Filter results based on user role and RBAC permissions
+3. Apply DLP masking to sensitive data in responses
+4. Provide comprehensive transparency explanations
+5. Maintain conversation memory across multiple turns
+6. Log all actions with LangSmith trace correlation for audit purposes
+
+## 🎯 Complete Feature Overview
+
+### ✅ Implemented Features:
+
+#### 🤖 Agentic AI Core:
+- **LangGraph Agent**: Autonomous decision-making with ReAct pattern
+- **Multi-tool Routing**: Intelligent selection between 3 specialized tools
+- **Conversation Memory**: Persistent multi-turn conversations with SQLite checkpointer
+- **Dynamic Tool Selection**: Web search can be toggled on/off per conversation
+
+#### 🔍 AI Tools:
+1. **PolicySearchTool**: RAG-powered security handbook search with ChromaDB
+2. **LogQueryTool**: Role-based security log analysis with CSV data
+3. **WebSearchTool**: Real-time threat intelligence via Tavily API
+
+#### 🔒 Enterprise Security:
+- **Role-Based Access Control (RBAC)**: Security vs Sales with granular permissions
+- **Prompt Injection Defense**: Pattern-based malicious input detection
+- **Data Loss Prevention (DLP)**: 9 sensitive data patterns with role-based masking
+- **Comprehensive Audit Logging**: Every action logged with DLP integration
+- **Security Transparency**: Complete AI decision explanations
+
+#### 📊 Advanced Observability:
+- **LangSmith Integration**: Full LLM tracing and performance monitoring
+- **Request Tracing**: Complete visibility into agent decision-making
+- **Performance Metrics**: Token usage, latency, and cost tracking
+- **Error Debugging**: Detailed trace analysis for troubleshooting
+
+## 🎬 Demo & Testing
+
+For comprehensive demo scenarios and testing instructions, see:
+- **DEMO_GUIDE.md**: Complete testing scenarios for all features
+- **Root README.md**: Project overview and quick start guide

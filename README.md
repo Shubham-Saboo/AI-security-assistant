@@ -1,216 +1,305 @@
-# 🛡️ Security Assistant - AI Evaluation Task
+# 🛡️ AI Security Assistant - Full Stack Evaluation Project
 
-An enterprise-grade AI-powered security assistant with agentic capabilities, built for the Aegeos AI Full Stack Engineer evaluation.
+> **Enterprise-grade AI-powered security assistant with agentic capabilities, comprehensive audit logging, and advanced observability.**
 
-## 📋 Project Overview
+## 🎯 Project Overview
 
-This application demonstrates a working prototype of a GenAI + Agentic AI full stack application in the context of enterprise security, featuring:
+This is a complete full-stack application demonstrating advanced AI capabilities in an enterprise security context. The system combines **Generative AI** (LLM-powered conversations) with **Agentic AI** (autonomous tool selection) to create an intelligent security assistant.
 
-- **Conversational AI** powered by OpenAI GPT-4o-mini
-- **Agentic behavior** with autonomous tool selection using LangGraph
-- **Retrieval-Augmented Generation (RAG)** using ChromaDB and OpenAI embeddings
-- **Role-Based Access Control (RBAC)** for Security vs Sales teams
-- **Security controls** including prompt injection defense and audit logging
-- **Full stack implementation** with React frontend and FastAPI backend
+### 🏗️ Architecture
 
-## 🚀 Quick Start
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React Frontend │    │  FastAPI Backend │    │  AI & Data Layer │
+│                 │    │                 │    │                 │
+│ • Chat Interface│◄──►│ • LangGraph Agent│◄──►│ • OpenAI GPT-4o │
+│ • Role Selection│    │ • Security Tools │    │ • ChromaDB (RAG)│
+│ • Transparency  │    │ • RBAC & Audit  │    │ • Tavily Search │
+│ • Web Controls  │    │ • DLP & Masking │    │ • LangSmith     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
 
-### Prerequisites
-- Python 3.8+ 
-- Node.js 16+
-- OpenAI API Key
+## 🚀 Quick Start for Interviewers
 
-### Option 1: Start Everything (Recommended)
+### ⚡ One-Command Setup
+
 ```bash
-# 1. Set up your OpenAI API key
-cp backend/env_example.txt backend/.env
-# Edit backend/.env and add your OPENAI_API_KEY
-
-# 2. Start both backend and frontend
-./start-all.sh
+# Clone and setup everything
+git clone https://github.com/Shubham-Saboo/AI-security-assistant.git
+cd AI-security-assistant
+chmod +x setup-for-interview.sh
+./setup-for-interview.sh
 ```
 
-### Option 2: Start Services Separately
+This will:
+1. 🐍 Create Python virtual environment
+2. 📦 Install all dependencies  
+3. 🔧 Setup sample configuration
+4. 🚀 Start both backend and frontend
+5. 🧪 Run initial tests
+
+**Access the application at:** http://localhost:3000
+
+### 📋 Manual Setup (if needed)
+
+<details>
+<summary>Click to expand manual setup steps</summary>
+
 ```bash
-# Terminal 1 - Backend
-./start-backend.sh
+# 1. Setup Python Backend
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+cd backend
+pip install -r requirements.txt
+cp env_example.txt .env
 
-# Terminal 2 - Frontend  
-./start-frontend.sh
+# 2. Add API Keys to .env
+# OPENAI_API_KEY=your_openai_key_here
+# LANGSMITH_API_KEY=your_langsmith_key_here (optional)
+# TAVILY_API_KEY=your_tavily_key_here (optional)
+
+# 3. Start Backend
+python -m app.main
+
+# 4. Setup Frontend (new terminal)
+cd ../frontend
+npm install
+npm start
+
+# 5. Access Application
+# Frontend: http://localhost:3000
+# API Docs: http://localhost:8000/docs
 ```
 
-### Access the Application
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
+</details>
 
-## 🏗️ Architecture
+## 🎯 Core Features Implemented
 
-### Backend (FastAPI + LangChain + ChromaDB)
-```
-├── app/main.py              # Complete backend (623 lines)
-├── requirements.txt         # Python dependencies
-└── SETUP.md                # Backend setup guide
-```
+### 🤖 Agentic AI Capabilities
+- **🧠 LangGraph Agent**: Autonomous decision-making and tool selection
+- **🔍 Policy Search Tool**: RAG-powered security handbook search  
+- **📊 Log Query Tool**: Role-based security log analysis
+- **🌐 Web Search Tool**: Real-time threat intelligence via Tavily
+- **🎯 Smart Routing**: AI decides which tool to use based on user query
 
-### Frontend (React TypeScript)
-```
-├── src/App.tsx              # Main chat interface
-├── src/App.css              # Complete styling
-└── README.md               # Frontend guide
-```
+### 🔒 Enterprise Security Features
+- **🛡️ Role-Based Access Control (RBAC)**: Security vs Sales role permissions
+- **🚫 Prompt Injection Defense**: Detects and blocks malicious inputs
+- **🔍 Data Loss Prevention (DLP)**: Automatic masking of sensitive data
+- **📝 Comprehensive Audit Logging**: Every action logged with trace correlation
+- **🔒 Security Transparency**: "Why did I answer this way?" explanations
 
-### Data & Configuration
-```
-├── mock_data/
-│   ├── handbooks/          # 3 security policy documents
-│   ├── logs/              # CSV security logs
-│   └── rbac_config.json   # Role permissions
-└── chroma_db/             # Vector embeddings (auto-generated)
-```
+### 📊 Advanced Observability  
+- **📈 LangSmith Integration**: Full LLM call tracing and performance monitoring
+- **🔍 Request Tracing**: Complete visibility into AI decision-making process
+- **📊 Performance Metrics**: Token usage, latency, and cost tracking
+- **🛠️ Debug Capabilities**: Detailed error analysis and troubleshooting
 
-## 🎯 Core Features
+### 💬 Multi-turn Conversations
+- **🧠 Persistent Memory**: LangGraph checkpointer with SQLite storage
+- **🔄 Context Retention**: AI remembers conversation history
+- **💬 Session Management**: New chat functionality with conversation IDs
 
-### ✅ Generative AI Chat Interface
-- React TypeScript frontend with real-time chat
-- OpenAI GPT-4o-mini for natural language processing
-- Conversation memory and context management
+## 🧪 Demo Scenarios for Testing
 
-### ✅ Agentic Tool Integration
-- **Policy Search Tool**: RAG-based search of security handbooks
-- **Log Query Tool**: CSV log analysis with filtering
-- **Autonomous Decision Making**: AI decides which tool to use
+### 👤 Security Role Testing
+```bash
+# Test policy search
+"How should I handle a phishing email?"
 
-### ✅ Role-Based Access Control (RBAC)
-- **Security Team**: Full access to all policies and logs
-- **Sales Team**: Limited access (no incident escalation procedures)
-- Document-level permissions with metadata filtering
+# Test log analysis  
+"Show me failed login attempts from the last week"
 
-### ✅ AI Security Controls
-- **Prompt Injection Defense**: Detects and blocks malicious inputs
-- **Audit Logging**: Comprehensive logging of all actions
-- **Data Masking**: Role-based information filtering
+# Test web search
+"What are the latest CVE vulnerabilities?"
 
-## 🧪 Evaluation Scenarios
-
-### Test Case 1: Phishing Email Handler
-```
-User: "How should I handle a suspected phishing email?"
-Assistant: Retrieves phishing policy → summarizes in plain English
+# Test restricted access
+"What is our incident escalation policy?"
 ```
 
-### Test Case 2: Log Analysis
-```
-User: "Show me today's failed login attempts from the logs"
-Assistant: Queries CSV logs → summarizes results with context
-```
+### 👥 Sales Role Testing  
+```bash
+# Test basic policy access
+"What are our password requirements?"
 
-### Test Case 3: Incident Escalation (Security Role Only)
-```
-User: "What's the escalation path for a security breach?"
-Assistant: Retrieves playbook steps → provides detailed procedures
-```
+# Test role-based restrictions
+"Show me security logs" (limited view)
 
-## 🔐 Security Features
+# Test web search access
+"Find recent cybersecurity news"
 
-### Document Access Control
-- **Public**: `phishing_response.md`, `general_security_policy.md`
-- **Restricted**: `incident_escalation.md` (Security team only)
-
-### User Roles
-- **Security Team**: Full access + critical incident procedures
-- **Sales Team**: Basic policies + filtered logs (sales dept only)
-
-### Audit Trail
-All interactions logged with:
-- Timestamp and user role
-- Query content and tool usage
-- Response summaries
-- Security events (prompt injection attempts)
-
-## 📊 Technical Implementation
-
-### RAG Pipeline
-1. **Document Processing**: RecursiveCharacterTextSplitter (1000 chars, 200 overlap)
-2. **Embeddings**: OpenAI text-embedding-3-small
-3. **Vector Storage**: ChromaDB with role-based metadata
-4. **Retrieval**: Similarity search with role filtering
-
-### Agent Architecture
-```python
-# LangGraph ReAct Agent
-tools = [PolicySearchTool(), LogQueryTool()]
-agent = create_react_agent(llm, tools, checkpointer=memory)
+# Test document restrictions
+"What is our incident escalation policy?" (access denied)
 ```
 
-### API Endpoints
-- `POST /chat` - Main chat interface
-- `GET /health` - System health check
-- `GET /audit-logs` - Audit trail (Security only)
-- `GET /available-documents` - User's accessible files
+### 🔍 Advanced Features Testing
+```bash
+# Test DLP masking
+"Check user john.doe with IP 192.168.1.100"
 
-## 🛠️ Development
+# Test transparency
+Click "🔍 Why did I answer this way?" on any response
 
-### Project Structure
+# Test conversation memory
+Start a conversation, then reference previous messages
+
+# Test web search toggle
+Use the toggle in the UI to enable/disable web search
+```
+
+## 🏗️ Technical Implementation
+
+### Backend Stack
+- **FastAPI**: Modern, fast web framework for APIs
+- **LangChain + LangGraph**: Agentic AI framework with graph-based workflows  
+- **OpenAI GPT-4o-mini**: Large language model for conversations
+- **ChromaDB**: Vector database for document retrieval (RAG)
+- **LangSmith**: LLM observability and performance monitoring
+- **Tavily**: Real-time web search capabilities
+
+### Frontend Stack  
+- **React + TypeScript**: Modern frontend with type safety
+- **CSS3**: Custom styling with responsive design
+- **Fetch API**: HTTP client for backend communication
+
+### Data & Security
+- **Role-Based Access Control**: Configurable permissions system
+- **Data Loss Prevention**: Regex-based sensitive data detection and masking
+- **Audit Logging**: Comprehensive logging with DLP integration
+- **Prompt Injection Defense**: Pattern-based malicious input detection
+
+## 📁 Project Structure
+
 ```
 Security-Assistant/
-├── backend/                 # FastAPI backend
-├── frontend/               # React frontend  
-├── mock_data/              # Sample data
-├── start-*.sh             # Startup scripts
-├── .gitignore             # Version control
-└── README.md              # This file
+├── 📱 frontend/                 # React TypeScript frontend
+│   ├── src/
+│   │   ├── App.tsx             # Main chat interface
+│   │   └── App.css             # UI styling
+│   └── package.json
+├── 🔧 backend/                  # FastAPI Python backend  
+│   ├── app/
+│   │   └── main.py             # Core application logic
+│   ├── requirements.txt        # Python dependencies
+│   └── SETUP.md               # Backend setup guide
+├── 📊 mock_data/               # Sample data and configuration
+│   ├── handbooks/             # Security policy documents
+│   ├── logs/                  # Security log samples  
+│   └── rbac_config.json       # Role-based access config
+├── 🗄️ chroma_db/              # Vector database storage
+├── 🚀 setup-for-interview.sh   # One-command setup script
+└── 📖 README.md               # This file
 ```
 
-### Key Technologies
-- **Backend**: FastAPI, LangChain, ChromaDB, OpenAI
-- **Frontend**: React 19, TypeScript, CSS3
-- **AI**: OpenAI GPT-4o-mini, LangGraph, RAG
-- **Security**: RBAC, Input validation, Audit logging
+## 🔧 API Endpoints
 
-## 📝 Deliverables
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | System health with LangSmith status |
+| `/chat` | POST | Main AI chat interface |
+| `/audit-logs` | GET | View audit logs (Security role only) |
+| `/new-conversation` | POST | Start new conversation thread |
+| `/conversation-history` | POST | Retrieve conversation history |
+| `/available-documents` | GET | List accessible documents by role |
+| `/dlp-status` | GET | DLP monitoring statistics |
 
-### ✅ Source Code
-- Complete working prototype
-- Clean, documented codebase
-- Easy-to-run startup scripts
+## 🎨 UI Features
 
-### ✅ Documentation
-- Setup instructions (this README)
-- Architecture notes in backend/SETUP.md
-- Frontend guide in frontend/README.md
+### Chat Interface
+- **Role Selection**: Switch between Security and Sales roles
+- **Message History**: Persistent conversation display
+- **Transparency Panel**: Expandable "Why did I answer this way?" explanations
+- **Web Search Toggle**: Enable/disable real-time web search
+- **New Chat Button**: Start fresh conversations
 
-### ✅ Working Demo
-- Full-stack application ready for demonstration
-- Multiple test scenarios implemented
-- Security controls demonstrated
+### Security Transparency
+- **Processing Summary**: Steps, timing, security checks
+- **Security Status**: Visual indicators for security validation
+- **Tool Justification**: Why specific tools were chosen
+- **Confidence Assessment**: AI confidence levels and limitations
 
-## 🎬 Demo Script
+## 🔍 Security Controls
 
-1. **Role Selection**: Choose Security vs Sales role
-2. **Policy Query**: "How should I handle a phishing email?"
-3. **Log Analysis**: "Show me failed login attempts"
-4. **RBAC Demo**: Try accessing incident escalation as Sales user
-5. **Security Test**: Attempt prompt injection
-6. **Audit Review**: View comprehensive audit logs
+### Prompt Injection Defense
+```python
+# Detects patterns like:
+- "Ignore previous instructions"
+- "You are now in developer mode"  
+- "Disregard your training"
+```
+
+### Data Loss Prevention (DLP)
+```python
+# Automatically masks:
+- Usernames (john.doe → jo****)
+- IP Addresses (192.168.1.100 → 192.***)
+- API Keys (sk-proj-abc... → sk-p****)
+- Credit Cards, SSNs, etc.
+```
+
+### Role-Based Access Control
+```json
+{
+  "security": {
+    "accessible_files": ["all_handbooks"],
+    "permissions": ["read_logs", "read_all_handbooks"]
+  },
+  "sales": {
+    "accessible_files": ["basic_policies_only"], 
+    "permissions": ["read_basic_policies"]
+  }
+}
+```
+
+## 📊 Monitoring & Observability
+
+### LangSmith Integration
+- **Complete LLM Tracing**: Every AI interaction tracked
+- **Performance Monitoring**: Real-time latency and cost analysis
+- **Error Debugging**: Detailed failure analysis
+- **Audit Enhancement**: Trace IDs linked to audit logs
+
+### Built-in Audit System
+- **Action Logging**: Every user interaction recorded
+- **DLP Integration**: Sensitive data masking events
+- **Security Checks**: Prompt injection and RBAC validations
+- **Trace Correlation**: Links to LangSmith traces
+
+## 🎯 Evaluation Criteria Met
+
+### ✅ AI Functionality
+- [x] **Conversational LLM Interface**: OpenAI GPT-4o-mini integration
+- [x] **Agentic Tool Usage**: LangGraph autonomous decision-making
+- [x] **Full Stack Implementation**: React frontend + FastAPI backend
+
+### ✅ AI Security  
+- [x] **Prompt Injection Defense**: Pattern-based malicious input detection
+- [x] **Role-Based Access Control**: Security vs Sales role permissions  
+- [x] **Audit Logging**: Comprehensive action tracking with trace correlation
+
+### ✅ Stretch Goals (All Implemented!)
+- [x] **Multiple Tools**: Policy search + Log query + Web search
+- [x] **Conversation Memory**: Multi-turn persistent conversations
+- [x] **RAG Implementation**: ChromaDB vector search with embeddings
+- [x] **Data Masking (DLP)**: Automatic sensitive data protection
+- [x] **Security Transparency**: Complete decision explanations
 
 ## 🚀 Production Deployment
 
-For production deployment:
-1. Set proper environment variables
-2. Use production OpenAI API limits
-3. Implement proper authentication
-4. Add HTTPS/TLS encryption
-5. Scale ChromaDB for production use
+The application is ready for production deployment with:
+- **Docker containerization** (configurable)
+- **Cloud platform deployment** (Railway, Render, AWS, etc.)
+- **Environment-based configuration**
+- **Comprehensive monitoring and alerting**
 
-## 📞 Support
+## 📝 License
 
-For questions about this evaluation project:
-- Check the backend/SETUP.md for detailed setup
-- View frontend/README.md for UI specifics
-- Review audit logs for troubleshooting
+This project is created for evaluation purposes and demonstrates enterprise-grade AI security assistant capabilities.
 
 ---
 
-**Built for Aegeos AI Full Stack Engineer Evaluation**  
-*Demonstrating enterprise-grade AI security assistant capabilities*
+**🎯 Ready for Interview Demo!** 
+
+Start with: `./setup-for-interview.sh` and access http://localhost:3000
+
+For questions or issues, the complete setup documentation is in `backend/SETUP.md`

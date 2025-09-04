@@ -6,6 +6,11 @@ OPENAI_API_KEY=your_openai_api_key_here
 # Tavily Configuration (Optional - for web search capabilities)
 TAVILY_API_KEY=your_tavily_api_key_here
 
+# LangSmith Configuration (Optional - for enhanced observability and tracing)
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=your_langsmith_api_key_here
+LANGSMITH_PROJECT=security-assistant
+
 # Application Configuration
 ENVIRONMENT=development
 LOG_LEVEL=INFO
