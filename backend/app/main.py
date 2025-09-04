@@ -35,6 +35,7 @@ from dotenv import load_dotenv
 import chromadb
 import sqlite3
 import uuid
+import re
 from chromadb.config import Settings
 
 # Load environment variables
@@ -172,15 +173,199 @@ def detect_prompt_injection(text: str) -> bool:
             return True
     return False
 
+# ========================
+# DATA LOSS PREVENTION (DLP)
+# ========================
+
+class DLPPattern:
+    """DLP pattern definition with masking strategy"""
+    def __init__(self, name: str, pattern: str, mask_char: str = "*", preserve_chars: int = 0):
+        self.name = name
+        self.pattern = re.compile(pattern, re.IGNORECASE)
+        self.mask_char = mask_char
+        self.preserve_chars = preserve_chars
+
+# Define DLP patterns for different types of sensitive data
+DLP_PATTERNS = [
+    # Personal Identifiers
+    DLPPattern(
+        name="username",
+        pattern=r'\b[a-zA-Z]+\.[a-zA-Z]+\b',  # john.doe format
+        preserve_chars=2
+    ),
+    DLPPattern(
+        name="user_id",
+        pattern=r'\bu\d{3,}\b',  # u001, u002 format
+        preserve_chars=1
+    ),
+    DLPPattern(
+        name="email",
+        pattern=r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+        preserve_chars=3
+    ),
+    
+    # Network & System Information
+    DLPPattern(
+        name="ipv4_address",
+        pattern=r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
+        preserve_chars=4  # Show first octet: 192.***.***.**
+    ),
+    DLPPattern(
+        name="internal_ip",
+        pattern=r'\b(?:10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.|192\.168\.)\d{1,3}\.\d{1,3}\b',
+        preserve_chars=3
+    ),
+    
+    # Security Credentials
+    DLPPattern(
+        name="api_key",
+        pattern=r'\b[a-zA-Z0-9]{32,}\b',  # Long alphanumeric strings
+        preserve_chars=4
+    ),
+    DLPPattern(
+        name="token",
+        pattern=r'\b(?:sk-|pk_|tvly-)[a-zA-Z0-9_-]{20,}\b',  # API key prefixes
+        preserve_chars=6
+    ),
+    
+    # Financial Data
+    DLPPattern(
+        name="credit_card",
+        pattern=r'\b(?:\d{4}[-\s]?){3}\d{4}\b',
+        preserve_chars=4
+    ),
+    DLPPattern(
+        name="ssn",
+        pattern=r'\b\d{3}-?\d{2}-?\d{4}\b',
+        preserve_chars=0  # Fully mask SSNs
+    ),
+]
+
+def mask_sensitive_data(text: str, user_role: str = "unknown") -> tuple[str, list]:
+    """
+    Apply DLP masking to sensitive data in text
+    
+    Args:
+        text: Input text to scan and mask
+        user_role: User role for role-based masking policies
+        
+    Returns:
+        Tuple of (masked_text, detected_patterns)
+    """
+    if not text:
+        return text, []
+    
+    masked_text = text
+    detected_patterns = []
+    
+    for dlp_pattern in DLP_PATTERNS:
+        matches = dlp_pattern.pattern.finditer(text)
+        
+        for match in matches:
+            original_value = match.group()
+            
+            # Apply role-based masking policies
+            if should_mask_for_role(dlp_pattern.name, user_role):
+                masked_value = apply_masking(original_value, dlp_pattern)
+                masked_text = masked_text.replace(original_value, masked_value)
+                
+                detected_patterns.append({
+                    "type": dlp_pattern.name,
+                    "original_length": len(original_value),
+                    "position": match.start(),
+                    "masked": True
+                })
+    
+    return masked_text, detected_patterns
+
+def should_mask_for_role(data_type: str, user_role: str) -> bool:
+    """
+    Determine if data should be masked based on user role
+    """
+    # Role-based masking policies
+    role_policies = {
+        "security": {
+            # Security team sees more data but still masks credentials
+            "api_key": True,
+            "token": True,
+            "credit_card": True,
+            "ssn": True,
+            "email": False,  # Security can see emails
+            "username": False,  # Security can see usernames
+            "user_id": False,
+            "ipv4_address": False,  # Security needs to see IPs
+            "internal_ip": False
+        },
+        "sales": {
+            # Sales team has more restricted access
+            "api_key": True,
+            "token": True,
+            "credit_card": True,
+            "ssn": True,
+            "email": True,  # Mask emails from sales
+            "username": True,  # Mask usernames from sales
+            "user_id": True,
+            "ipv4_address": True,  # Mask IPs from sales
+            "internal_ip": True
+        }
+    }
+    
+    # Default to strict masking for unknown roles
+    default_policy = {data_type: True for data_type in [p.name for p in DLP_PATTERNS]}
+    
+    return role_policies.get(user_role, default_policy).get(data_type, True)
+
+def apply_masking(value: str, pattern: DLPPattern) -> str:
+    """
+    Apply masking to a specific value based on the pattern configuration
+    """
+    if pattern.preserve_chars == 0:
+        # Fully mask
+        return pattern.mask_char * len(value)
+    
+    if len(value) <= pattern.preserve_chars:
+        # If value is too short, mask everything
+        return pattern.mask_char * len(value)
+    
+    # Preserve first N characters, mask the rest
+    preserved = value[:pattern.preserve_chars]
+    masked_portion = pattern.mask_char * (len(value) - pattern.preserve_chars)
+    
+    return preserved + masked_portion
+
+def log_dlp_event(user_role: str, data_types: list, context: str):
+    """Log DLP masking events for security monitoring"""
+    if data_types:
+        dlp_entry = AuditLogEntry(
+            timestamp=datetime.now(),
+            user_role=user_role,
+            action="dlp_masking_applied",
+            tool_used="dlp_system",
+            query=context[:50] + "..." if len(context) > 50 else context,
+            result=f"Masked {len(data_types)} sensitive data types: {', '.join(set([d['type'] for d in data_types]))}"
+        )
+        audit_log.append(dlp_entry)
+        logger.info(f"DLP: Masked sensitive data for {user_role}: {[d['type'] for d in data_types]}")
+
 def log_audit_entry(user_role: str, action: str, query: str, tool_used: str = None, result: str = ""):
-    """Log action for audit purposes"""
+    """Log action for audit purposes with DLP masking"""
+    # Apply DLP masking to query and result
+    masked_query, query_dlp_patterns = mask_sensitive_data(query, user_role)
+    masked_result, result_dlp_patterns = mask_sensitive_data(result, user_role)
+    
+    # Log DLP events if sensitive data was detected
+    all_dlp_patterns = query_dlp_patterns + result_dlp_patterns
+    if all_dlp_patterns:
+        log_dlp_event(user_role, all_dlp_patterns, f"Query: {query[:50]}, Result: {result[:50]}")
+    
+    # Create audit entry with masked data
     entry = AuditLogEntry(
         timestamp=datetime.now(),
         user_role=user_role,
         action=action,
-        query=query,
+        query=masked_query,
         tool_used=tool_used,
-        result=result[:200] + "..." if len(result) > 200 else result
+        result=masked_result[:200] + "..." if len(masked_result) > 200 else masked_result
     )
     audit_log.append(entry)
     logger.info(f"AUDIT: {user_role} - {action} - {tool_used}")
@@ -704,11 +889,18 @@ Remember: You are helping with enterprise security, so be professional and accur
         # Extract the response
         assistant_message = response["messages"][-1].content
         
+        # Apply DLP masking to the assistant's response
+        masked_response, dlp_patterns = mask_sensitive_data(assistant_message, request.user_role)
+        
+        # Log DLP masking if sensitive data was detected in response
+        if dlp_patterns:
+            log_dlp_event(request.user_role, dlp_patterns, f"AI Response: {assistant_message[:50]}")
+        
         # Extract tool calls from response (simplified)
         tool_calls = []
         sources = []
         
-        # Log the interaction
+        # Log the interaction (using original message for audit, but the response will be logged masked)
         log_audit_entry(
             user_role=request.user_role,
             action="chat_query",
@@ -717,7 +909,7 @@ Remember: You are helping with enterprise security, so be professional and accur
         )
         
         return ChatResponse(
-            response=assistant_message,
+            response=masked_response,  # Return the DLP-masked response
             sources=sources,
             tool_calls=tool_calls
         )
@@ -832,6 +1024,47 @@ async def get_available_documents(user_role: str):
     
     accessible_files = rbac_config["roles"][user_role]["accessible_files"]
     return {"accessible_documents": accessible_files}
+
+@app.get("/dlp-status")
+async def get_dlp_status(user_role: str = "security"):
+    """Get DLP masking statistics and patterns (Security role only)"""
+    if user_role != "security":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Security role required for DLP monitoring"
+        )
+    
+    # Count DLP events in audit log
+    dlp_events = [log for log in audit_log if log.action == "dlp_masking_applied"]
+    
+    # Statistics
+    total_dlp_events = len(dlp_events)
+    recent_dlp_events = [log for log in dlp_events if 
+                        (datetime.now() - log.timestamp).total_seconds() < 3600]  # Last hour
+    
+    # Pattern analysis
+    pattern_stats = {}
+    for event in dlp_events:
+        # Extract pattern types from result
+        if "Masked" in event.result:
+            patterns = event.result.split(": ")[-1] if ": " in event.result else ""
+            for pattern in patterns.split(", "):
+                pattern = pattern.strip()
+                if pattern:
+                    pattern_stats[pattern] = pattern_stats.get(pattern, 0) + 1
+    
+    return {
+        "dlp_monitoring": {
+            "total_events": total_dlp_events,
+            "recent_events_1h": len(recent_dlp_events),
+            "pattern_statistics": pattern_stats,
+            "supported_patterns": [p.name for p in DLP_PATTERNS],
+            "role_policies": {
+                "security": "Relaxed masking for operational needs",
+                "sales": "Strict masking for data protection"
+            }
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn
