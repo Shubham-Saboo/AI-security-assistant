@@ -1,6 +1,98 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 
+// Simple markdown renderer for basic formatting
+const renderMarkdown = (text: string) => {
+  return text.split('\n').map((line, index) => {
+    // Handle headers (### Header)
+    if (line.startsWith('### ')) {
+      return (
+        <h3 key={index} className="markdown-h3">
+          {line.replace('### ', '')}
+        </h3>
+      );
+    }
+    
+    // Handle headers (## Header)
+    if (line.startsWith('## ')) {
+      return (
+        <h2 key={index} className="markdown-h2">
+          {line.replace('## ', '')}
+        </h2>
+      );
+    }
+    
+    // Handle numbered lists (1. Item)
+    if (/^\d+\.\s/.test(line)) {
+      const content = line.replace(/^\d+\.\s/, '');
+      return (
+        <div key={index} className="markdown-list-item numbered">
+          <span className="list-number">{line.match(/^\d+/)?.[0]}.</span>
+          <span className="list-content">{renderInlineMarkdown(content)}</span>
+        </div>
+      );
+    }
+    
+    // Handle bullet points (- Item) with various indentation levels
+    if (line.match(/^\s*-\s/)) {
+      const leadingSpaces = line.match(/^(\s*)/)?.[1].length || 0;
+      const indentLevel = Math.floor(leadingSpaces / 3); // Every 3 spaces = 1 indent level
+      const content = line.replace(/^\s*-\s/, '');
+      return (
+        <div key={index} className={`markdown-list-item bullet indent-${indentLevel}`}>
+          <span className="bullet-point">•</span>
+          <span className="list-content">{renderInlineMarkdown(content)}</span>
+        </div>
+      );
+    }
+    
+    // Handle empty lines
+    if (line.trim() === '') {
+      return <br key={index} />;
+    }
+    
+    // Handle regular paragraphs
+    return (
+      <p key={index} className="markdown-paragraph">
+        {renderInlineMarkdown(line)}
+      </p>
+    );
+  });
+};
+
+// Render inline markdown (bold, italic, code)
+const renderInlineMarkdown = (text: string) => {
+  // Handle **bold** text
+  let parts = text.split(/(\*\*[^*]+\*\*)/g);
+  
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={index} className="markdown-bold">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    
+    // Handle `code` text
+    if (part.includes('`')) {
+      const codeParts = part.split(/(`[^`]+`)/g);
+      return codeParts.map((codePart, codeIndex) => {
+        if (codePart.startsWith('`') && codePart.endsWith('`')) {
+          return (
+            <code key={`${index}-${codeIndex}`} className="markdown-code">
+              {codePart.slice(1, -1)}
+            </code>
+          );
+        }
+        return codePart;
+      });
+    }
+    
+    return part;
+  });
+};
+
 // Types
 interface ChatMessage {
   id: string;
@@ -278,12 +370,7 @@ const App: React.FC = () => {
             <div key={message.id} className={`message ${message.role}`}>
               <div className="message-content">
                 <div className="message-text">
-                  {message.content.split('\n').map((line, index) => (
-                    <React.Fragment key={index}>
-                      {line}
-                      {index < message.content.split('\n').length - 1 && <br />}
-                    </React.Fragment>
-                  ))}
+                  {renderMarkdown(message.content)}
                 </div>
                 
                 {/* Transparency explanation for assistant messages */}
