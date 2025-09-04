@@ -109,6 +109,7 @@ class ChatResponse(BaseModel):
     response: str = Field(..., description="Assistant response")
     sources: List[str] = Field(default=[], description="Source documents used")
     tool_calls: List[str] = Field(default=[], description="Tools called")
+    transparency: Optional[Dict[str, Any]] = Field(default=None, description="Security transparency explanation")
 
 class AuditLogEntry(BaseModel):
     timestamp: datetime
@@ -347,6 +348,237 @@ def log_dlp_event(user_role: str, data_types: list, context: str):
         audit_log.append(dlp_entry)
         logger.info(f"DLP: Masked sensitive data for {user_role}: {[d['type'] for d in data_types]}")
 
+# ========================
+# SECURITY TRANSPARENCY SYSTEM
+# ========================
+
+class SecurityDecisionTracker:
+    """Track AI decision-making process for security transparency"""
+    
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        """Reset tracking for new request"""
+        self.steps = []
+        self.security_checks = {}
+        self.tool_usage = {}
+        self.data_sources = []
+        self.confidence_scores = {}
+        self.access_decisions = {}
+        self.processing_time = 0
+        self.start_time = datetime.now()
+    
+    def add_step(self, step_name: str, description: str, status: str = "completed", details: Dict = None):
+        """Add a processing step"""
+        self.steps.append({
+            "step": step_name,
+            "description": description,
+            "status": status,
+            "timestamp": datetime.now(),
+            "details": details or {}
+        })
+    
+    def add_security_check(self, check_name: str, result: bool, reason: str = ""):
+        """Record security check results"""
+        self.security_checks[check_name] = {
+            "passed": result,
+            "reason": reason,
+            "timestamp": datetime.now()
+        }
+    
+    def add_tool_usage(self, tool_name: str, reason: str, confidence: float = 0.0, results_count: int = 0):
+        """Record tool usage and reasoning"""
+        self.tool_usage[tool_name] = {
+            "reason": reason,
+            "confidence": confidence,
+            "results_count": results_count,
+            "timestamp": datetime.now()
+        }
+    
+    def add_data_source(self, source: str, relevance: str, access_level: str):
+        """Record data sources used"""
+        self.data_sources.append({
+            "source": source,
+            "relevance": relevance,
+            "access_level": access_level,
+            "timestamp": datetime.now()
+        })
+    
+    def add_access_decision(self, resource: str, granted: bool, reason: str):
+        """Record access control decisions"""
+        self.access_decisions[resource] = {
+            "granted": granted,
+            "reason": reason,
+            "timestamp": datetime.now()
+        }
+    
+    def finalize(self):
+        """Finalize tracking and calculate metrics"""
+        self.processing_time = (datetime.now() - self.start_time).total_seconds()
+    
+    def get_explanation(self, user_role: str) -> Dict[str, Any]:
+        """Generate comprehensive explanation for the user"""
+        self.finalize()
+        
+        explanation = {
+            "processing_summary": {
+                "total_steps": len(self.steps),
+                "processing_time_ms": round(self.processing_time * 1000, 2),
+                "security_checks_passed": sum(1 for check in self.security_checks.values() if check["passed"]),
+                "tools_used": len(self.tool_usage),
+                "data_sources": len(self.data_sources)
+            },
+            "security_analysis": self._get_security_analysis(),
+            "decision_flow": self._get_decision_flow(),
+            "tool_justification": self._get_tool_justification(),
+            "data_sources": self._get_data_sources_explanation(),
+            "access_control": self._get_access_control_explanation(),
+            "confidence_assessment": self._get_confidence_assessment()
+        }
+        
+        # Role-based explanation filtering
+        if user_role != "security":
+            # Filter sensitive details for non-security users
+            explanation = self._filter_explanation_for_role(explanation, user_role)
+        
+        return explanation
+    
+    def _get_security_analysis(self) -> Dict[str, Any]:
+        """Get security analysis summary"""
+        return {
+            "checks_performed": [
+                {
+                    "check": check_name,
+                    "status": "✅ PASSED" if details["passed"] else "❌ FAILED",
+                    "reason": details["reason"]
+                }
+                for check_name, details in self.security_checks.items()
+            ],
+            "overall_status": "SECURE" if all(check["passed"] for check in self.security_checks.values()) else "ISSUES_DETECTED"
+        }
+    
+    def _get_decision_flow(self) -> List[Dict[str, Any]]:
+        """Get processing decision flow"""
+        return [
+            {
+                "step": step["step"],
+                "description": step["description"],
+                "status": step["status"],
+                "duration_ms": round((step["timestamp"] - self.start_time).total_seconds() * 1000, 2)
+            }
+            for step in self.steps
+        ]
+    
+    def _get_tool_justification(self) -> Dict[str, Any]:
+        """Explain tool selection reasoning"""
+        return {
+            "tools_selected": [
+                {
+                    "tool": tool_name,
+                    "justification": details["reason"],
+                    "confidence": f"{details['confidence']:.1%}" if details['confidence'] > 0 else "N/A",
+                    "results_found": details["results_count"]
+                }
+                for tool_name, details in self.tool_usage.items()
+            ],
+            "selection_strategy": self._get_tool_selection_strategy()
+        }
+    
+    def _get_tool_selection_strategy(self) -> str:
+        """Explain overall tool selection strategy"""
+        if not self.tool_usage:
+            return "No external tools required - answered from general knowledge"
+        
+        strategies = []
+        if "policy_search" in self.tool_usage:
+            strategies.append("policy-based (internal documents)")
+        if "log_query" in self.tool_usage:
+            strategies.append("log analysis (historical data)")
+        if "web_search" in self.tool_usage:
+            strategies.append("web search (real-time data)")
+        
+        return f"Multi-tool approach: {', '.join(strategies)}"
+    
+    def _get_data_sources_explanation(self) -> List[Dict[str, Any]]:
+        """Explain data sources and their relevance"""
+        return [
+            {
+                "source": source["source"],
+                "relevance": source["relevance"],
+                "access_level": source["access_level"]
+            }
+            for source in self.data_sources
+        ]
+    
+    def _get_access_control_explanation(self) -> Dict[str, Any]:
+        """Explain access control decisions"""
+        return {
+            "decisions": [
+                {
+                    "resource": resource,
+                    "access": "✅ GRANTED" if details["granted"] else "❌ DENIED",
+                    "reason": details["reason"]
+                }
+                for resource, details in self.access_decisions.items()
+            ],
+            "rbac_summary": f"Role-based access control applied for user role"
+        }
+    
+    def _get_confidence_assessment(self) -> Dict[str, Any]:
+        """Calculate and explain confidence levels"""
+        if not self.tool_usage:
+            return {
+                "overall_confidence": "Medium",
+                "basis": "General knowledge base",
+                "limitations": "No specific documentation consulted"
+            }
+        
+        avg_confidence = sum(details["confidence"] for details in self.tool_usage.values()) / len(self.tool_usage)
+        
+        if avg_confidence >= 0.8:
+            confidence_level = "High"
+        elif avg_confidence >= 0.5:
+            confidence_level = "Medium"
+        else:
+            confidence_level = "Low"
+        
+        return {
+            "overall_confidence": confidence_level,
+            "confidence_score": f"{avg_confidence:.1%}",
+            "basis": f"Based on {len(self.data_sources)} data sources",
+            "limitations": self._get_confidence_limitations()
+        }
+    
+    def _get_confidence_limitations(self) -> str:
+        """Identify confidence limitations"""
+        limitations = []
+        
+        if not any("web_search" in tool for tool in self.tool_usage):
+            limitations.append("no real-time data consulted")
+        
+        if len(self.data_sources) < 2:
+            limitations.append("limited data sources")
+        
+        if not limitations:
+            return "No significant limitations identified"
+        
+        return ', '.join(limitations)
+    
+    def _filter_explanation_for_role(self, explanation: Dict, user_role: str) -> Dict:
+        """Filter explanation details based on user role"""
+        if user_role == "sales":
+            # Remove sensitive security details for sales users
+            explanation["security_analysis"] = {
+                "overall_status": explanation["security_analysis"]["overall_status"],
+                "note": "Detailed security checks available to security team only"
+            }
+        
+        return explanation
+
+# Global transparency tracker
+transparency_tracker = SecurityDecisionTracker()
+
 def log_audit_entry(user_role: str, action: str, query: str, tool_used: str = None, result: str = ""):
     """Log action for audit purposes with DLP masking"""
     # Apply DLP masking to query and result
@@ -531,11 +763,17 @@ class PolicySearchTool(BaseTool):
     
     def _run(self, query: str, user_role: str = "sales") -> str:
         """Search for relevant policy documents"""
+        global transparency_tracker
         try:
+            transparency_tracker.add_tool_usage("policy_search", f"User asked about security policies/procedures: '{query[:50]}...'")
             docs = search_documents_by_role(query, user_role, k=3)
             
             if not docs:
+                transparency_tracker.add_tool_usage("policy_search", "No matching documents found", confidence=0.0, results_count=0)
                 return "No relevant policy documents found for your query."
+            
+            # Add transparency tracking for successful search
+            transparency_tracker.add_tool_usage("policy_search", f"Found {len(docs)} relevant policy documents", confidence=0.9, results_count=len(docs))
             
             # Format response
             response = "Found relevant policy information:\n\n"
@@ -544,6 +782,11 @@ class PolicySearchTool(BaseTool):
             for i, doc in enumerate(docs, 1):
                 source_file = doc.metadata.get("source_file", "unknown")
                 sources.append(source_file)
+                
+                # Add data source tracking
+                accessibility = "role-filtered" if user_role in doc.metadata.get("accessible_roles", "").split(",") else "unrestricted"
+                transparency_tracker.add_data_source(source_file, "high", accessibility)
+                transparency_tracker.add_access_decision(source_file, True, f"Document accessible to {user_role} role")
                 
                 response += f"**Source {i}: {source_file}**\n"
                 response += f"{doc.page_content}\n\n"
@@ -797,8 +1040,15 @@ async def health_check():
 async def chat_endpoint(request: ChatRequest):
     """Main chat endpoint with AI assistant"""
     
+    # Initialize transparency tracking
+    global transparency_tracker
+    transparency_tracker.reset()
+    transparency_tracker.add_step("request_received", f"Processing query from {request.user_role} role")
+    
     # Security: Check for prompt injection
+    transparency_tracker.add_step("prompt_injection_check", "Scanning for malicious input patterns")
     if detect_prompt_injection(request.message):
+        transparency_tracker.add_security_check("prompt_injection", False, "Malicious patterns detected")
         log_audit_entry(
             user_role=request.user_role,
             action="prompt_injection_detected",
@@ -810,15 +1060,23 @@ async def chat_endpoint(request: ChatRequest):
             detail="Potentially malicious input detected. Please rephrase your question."
         )
     
+    transparency_tracker.add_security_check("prompt_injection", True, "No malicious patterns found")
+    
     # Validate user role
+    transparency_tracker.add_step("rbac_validation", "Validating user role and permissions")
     if request.user_role not in rbac_config["roles"]:
+        transparency_tracker.add_security_check("rbac_validation", False, f"Invalid role: {request.user_role}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid user role"
         )
     
+    transparency_tracker.add_security_check("rbac_validation", True, f"Valid role: {request.user_role}")
+    transparency_tracker.add_access_decision("system_access", True, f"Role {request.user_role} authorized")
+    
     try:
         # Create agent with web search setting
+        transparency_tracker.add_step("agent_creation", f"Creating AI agent with web_search={request.web_search_enabled}")
         agent = create_security_agent(web_search_enabled=request.web_search_enabled)
         
         # Configuration for conversation
@@ -881,6 +1139,7 @@ Remember: You are helping with enterprise security, so be professional and accur
             ]
         
         # Run the agent - it will handle conversation state automatically
+        transparency_tracker.add_step("ai_processing", "Executing AI agent with selected tools")
         response = agent.invoke(
             {"messages": input_messages},
             config=config
@@ -888,17 +1147,25 @@ Remember: You are helping with enterprise security, so be professional and accur
         
         # Extract the response
         assistant_message = response["messages"][-1].content
+        transparency_tracker.add_step("response_generated", f"AI generated {len(assistant_message)} character response")
         
         # Apply DLP masking to the assistant's response
+        transparency_tracker.add_step("dlp_processing", "Applying data loss prevention scanning")
         masked_response, dlp_patterns = mask_sensitive_data(assistant_message, request.user_role)
         
         # Log DLP masking if sensitive data was detected in response
         if dlp_patterns:
+            transparency_tracker.add_security_check("dlp_masking", True, f"Masked {len(dlp_patterns)} sensitive data patterns")
             log_dlp_event(request.user_role, dlp_patterns, f"AI Response: {assistant_message[:50]}")
+        else:
+            transparency_tracker.add_security_check("dlp_masking", True, "No sensitive data detected")
         
         # Extract tool calls from response (simplified)
         tool_calls = []
         sources = []
+        
+        # Generate transparency explanation
+        transparency_explanation = transparency_tracker.get_explanation(request.user_role)
         
         # Log the interaction (using original message for audit, but the response will be logged masked)
         log_audit_entry(
@@ -911,7 +1178,8 @@ Remember: You are helping with enterprise security, so be professional and accur
         return ChatResponse(
             response=masked_response,  # Return the DLP-masked response
             sources=sources,
-            tool_calls=tool_calls
+            tool_calls=tool_calls,
+            transparency=transparency_explanation
         )
         
     except Exception as e:
