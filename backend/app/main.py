@@ -27,11 +27,14 @@ from langchain.tools import BaseTool
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_tavily import TavilySearch
 
 # Environment and utilities
 from dotenv import load_dotenv
 import chromadb
+import sqlite3
+import uuid
 from chromadb.config import Settings
 
 # Load environment variables
@@ -93,6 +96,13 @@ class ChatRequest(BaseModel):
     user_role: str = Field(..., description="User role: security or sales")
     conversation_id: Optional[str] = Field(None, description="Conversation ID for memory")
     web_search_enabled: Optional[bool] = Field(True, description="Whether web search tool is enabled")
+
+class NewConversationRequest(BaseModel):
+    user_role: str = Field(..., description="User role: security or sales")
+
+class ConversationHistoryRequest(BaseModel):
+    conversation_id: str = Field(..., description="Conversation ID to get history for")
+    user_role: str = Field(..., description="User role: security or sales")
 
 class ChatResponse(BaseModel):
     response: str = Field(..., description="Assistant response")
@@ -524,7 +534,7 @@ class WebSearchTool(BaseTool):
 # ========================
 
 def create_security_agent(web_search_enabled: bool = True):
-    """Create LangChain agent with security tools"""
+    """Create LangChain agent with security tools and persistent memory"""
     
     # Create base tools
     tools = [
@@ -536,8 +546,15 @@ def create_security_agent(web_search_enabled: bool = True):
     if web_search_enabled:
         tools.append(WebSearchTool())
     
-    # Create agent with memory
-    memory = MemorySaver()
+    # Create persistent memory using SQLite
+    memory_db_path = "conversations.db"
+    try:
+        # Try to use SQLite for persistent memory
+        conn = sqlite3.connect(memory_db_path, check_same_thread=False)
+        memory = SqliteSaver(conn)
+    except Exception as e:
+        logger.warning(f"Failed to create SQLite checkpointer, falling back to in-memory: {e}")
+        memory = MemorySaver()
     
     agent = create_react_agent(
         llm, 
@@ -656,12 +673,31 @@ Guidelines:
 
 Remember: You are helping with enterprise security, so be professional and accurate."""
 
-        # Run the agent
-        response = agent.invoke(
-            {"messages": [
+        # Check if this is a new conversation by trying to get current state
+        try:
+            current_state = agent.get_state(config)
+            is_new_conversation = not bool(current_state.values.get("messages", []))
+        except Exception:
+            is_new_conversation = True
+        
+        # For new conversations, we need to include the system prompt
+        # For continuing conversations, we just add the user message and let LangGraph handle the rest
+        if is_new_conversation:
+            # Start new conversation with system prompt
+            input_messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": request.message}
-            ]},
+            ]
+        else:
+            # Continue existing conversation - just add user message
+            # LangGraph will automatically maintain the conversation history
+            input_messages = [
+                {"role": "user", "content": request.message}
+            ]
+        
+        # Run the agent - it will handle conversation state automatically
+        response = agent.invoke(
+            {"messages": input_messages},
             config=config
         )
         
@@ -691,6 +727,85 @@ Remember: You are helping with enterprise security, so be professional and accur
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing request: {str(e)}"
+        )
+
+@app.post("/new-conversation")
+async def start_new_conversation(request: NewConversationRequest):
+    """Start a new conversation and return conversation ID"""
+    try:
+        # Generate unique conversation ID
+        conversation_id = str(uuid.uuid4())
+        
+        # Log the new conversation
+        log_audit_entry(
+            user_role=request.user_role,
+            action="new_conversation_started",
+            query="",
+            result=f"New conversation started with ID: {conversation_id}"
+        )
+        
+        return {
+            "conversation_id": conversation_id,
+            "message": "New conversation started successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error starting new conversation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error starting new conversation: {str(e)}"
+        )
+
+@app.post("/conversation-history")
+async def get_conversation_history(request: ConversationHistoryRequest):
+    """Get conversation history for a specific conversation ID"""
+    try:
+        # Create agent to access conversation state
+        agent = create_security_agent()
+        
+        # Configuration for the specific conversation
+        config = {
+            "configurable": {
+                "thread_id": request.conversation_id
+            }
+        }
+        
+        # Get the conversation state
+        try:
+            state = agent.get_state(config)
+            messages = state.values.get("messages", [])
+            
+            # Format messages for frontend
+            formatted_messages = []
+            for msg in messages:
+                if hasattr(msg, 'content') and hasattr(msg, 'type'):
+                    # Skip system messages for cleaner history
+                    if msg.type != "system":
+                        formatted_messages.append({
+                            "role": msg.type,
+                            "content": msg.content,
+                            "timestamp": datetime.now().isoformat()  # Simplified timestamp
+                        })
+            
+            return {
+                "conversation_id": request.conversation_id,
+                "messages": formatted_messages,
+                "total_messages": len(formatted_messages)
+            }
+            
+        except Exception as e:
+            # Conversation doesn't exist or is empty
+            return {
+                "conversation_id": request.conversation_id,
+                "messages": [],
+                "total_messages": 0
+            }
+        
+    except Exception as e:
+        logger.error(f"Error getting conversation history: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting conversation history: {str(e)}"
         )
 
 @app.get("/audit-logs")

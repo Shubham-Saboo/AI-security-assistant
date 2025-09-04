@@ -23,6 +23,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [webSearchEnabled, setWebSearchEnabled] = useState(true);
+  const [conversationId, setConversationId] = useState<string>('');
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -70,7 +71,7 @@ const App: React.FC = () => {
         body: JSON.stringify({
           message: message,
           user_role: userRole,
-          conversation_id: 'web-session',
+          conversation_id: conversationId || 'default-session',
           web_search_enabled: webSearchEnabled
         }),
       });
@@ -96,6 +97,31 @@ const App: React.FC = () => {
       console.error('Chat error:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Start a new conversation
+  const startNewConversation = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/new-conversation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_role: userRole
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setConversationId(data.conversation_id);
+        setMessages([]);
+        setError('');
+        console.log('New conversation started:', data.conversation_id);
+      }
+    } catch (err) {
+      console.error('Failed to start new conversation:', err);
     }
   };
 
@@ -206,11 +232,19 @@ const App: React.FC = () => {
               </label>
             </div>
             <button 
+              className="new-chat-btn"
+              onClick={startNewConversation}
+              title="Start a new conversation"
+            >
+              💬 New Chat
+            </button>
+            <button 
               className="change-role-btn"
               onClick={() => {
                 setUserRole('');
                 setMessages([]);
                 setError('');
+                setConversationId('');
               }}
             >
               Change Role
