@@ -1,0 +1,11 @@
+# Copy this to .env and add your OpenAI API key
+
+# OpenAI Configuration
+OPENAI_API_KEY='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'
+
+# Application Configuration
+ENVIRONMENT=development
+LOG_LEVEL=INFO
+
+# Database Configuration (ChromaDB is file-based, no config needed)
+CHROMA_DB_PATH=./chroma_db

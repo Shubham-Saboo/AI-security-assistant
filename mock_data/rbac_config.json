@@ -1,0 +1,67 @@
+{
+  "roles": {
+    "security": {
+      "permissions": [
+        "read_logs",
+        "read_all_handbooks", 
+        "incident_response",
+        "system_admin",
+        "audit_access"
+      ],
+      "accessible_files": [
+        "security_logs.csv",
+        "phishing_response.md",
+        "general_security_policy.md", 
+        "incident_escalation.md"
+      ],
+      "log_filters": {
+        "risk_levels": ["low", "medium", "high", "critical"],
+        "departments": ["all"],
+        "actions": ["all"]
+      },
+      "description": "Full access to all security resources and incident response procedures"
+    },
+    "sales": {
+      "permissions": [
+        "read_basic_policies",
+        "limited_log_access"
+      ],
+      "accessible_files": [
+        "phishing_response.md",
+        "general_security_policy.md"
+      ],
+      "restricted_files": [
+        "incident_escalation.md"
+      ],
+      "log_filters": {
+        "risk_levels": ["low", "medium"],
+        "departments": ["sales", "marketing"],
+        "actions": ["login", "file_access", "email_access"],
+        "exclude_sensitive": true
+      },
+      "description": "Limited access to basic security policies and sales-related logs only"
+    }
+  },
+  "file_classifications": {
+    "incident_escalation.md": {
+      "classification": "confidential",
+      "required_roles": ["security"],
+      "access_reason": "Contains sensitive escalation procedures and contact information"
+    },
+    "phishing_response.md": {
+      "classification": "internal",
+      "required_roles": ["security", "sales"],
+      "access_reason": "General employee security guidance"
+    },
+    "general_security_policy.md": {
+      "classification": "internal", 
+      "required_roles": ["security", "sales"],
+      "access_reason": "Company-wide security policies"
+    },
+    "security_logs.csv": {
+      "classification": "restricted",
+      "required_roles": ["security", "sales"],
+      "access_reason": "Log data with role-based filtering applied"
+    }
+  }
+}
