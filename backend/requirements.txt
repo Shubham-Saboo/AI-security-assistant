@@ -10,6 +10,7 @@ langchain-openai>=0.2.9
 langchain-community>=0.3.7
 langgraph>=0.2.45
 langchain-chroma>=0.1.4
+langchain-tavily>=0.2.11
 
 # Vector database and embeddings
 chromadb>=0.5.23

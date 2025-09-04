@@ -1,0 +1,470 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* Role Selection Styles */
+.role-selection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.role-card {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  max-width: 600px;
+  width: 100%;
+}
+
+.role-card h1 {
+  color: #2d3748;
+  margin-bottom: 10px;
+  font-size: 2.5rem;
+}
+
+.role-card p {
+  color: #718096;
+  margin-bottom: 40px;
+  font-size: 1.1rem;
+}
+
+.role-buttons {
+  display: flex;
+  gap: 20px;
+  flex-direction: column;
+}
+
+.role-btn {
+  display: flex;
+  align-items: center;
+  padding: 20px;
+  border: 2px solid transparent;
+  border-radius: 15px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.role-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.security-btn:hover {
+  border-color: #3182ce;
+  background: #ebf8ff;
+}
+
+.sales-btn:hover {
+  border-color: #38a169;
+  background: #f0fff4;
+}
+
+.role-icon {
+  font-size: 3rem;
+  margin-right: 20px;
+}
+
+.role-info h3 {
+  color: #2d3748;
+  margin-bottom: 5px;
+  font-size: 1.3rem;
+}
+
+.role-info p {
+  color: #718096;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* Chat Container Styles */
+.chat-container {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  max-width: 800px;
+  width: 100%;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header Styles */
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.header-left h2 {
+  margin-bottom: 5px;
+  font-size: 1.5rem;
+}
+
+.role-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.role-badge.security {
+  background: rgba(49, 130, 206, 0.2);
+  border: 1px solid rgba(49, 130, 206, 0.5);
+}
+
+.role-badge.sales {
+  background: rgba(56, 161, 105, 0.2);
+  border: 1px solid rgba(56, 161, 105, 0.5);
+}
+
+.change-role-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.change-role-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/* Web Search Toggle Styles */
+.web-search-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-text {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: white;
+}
+
+.toggle-checkbox {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-checkbox:checked + .toggle-slider {
+  background: rgba(72, 187, 120, 0.8);
+  border-color: rgba(72, 187, 120, 0.9);
+}
+
+.toggle-checkbox:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+/* Messages Styles */
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.welcome-message {
+  text-align: center;
+  color: #718096;
+  padding: 40px 20px;
+}
+
+.welcome-message h3 {
+  margin-bottom: 20px;
+  color: #2d3748;
+}
+
+.sample-queries {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.sample-query {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  font-size: 0.9rem;
+  color: #4a5568;
+}
+
+.sample-query:hover {
+  background: #edf2f7;
+  border-color: #cbd5e0;
+  transform: translateY(-1px);
+}
+
+.message {
+  display: flex;
+  margin-bottom: 15px;
+}
+
+.message.user {
+  justify-content: flex-end;
+}
+
+.message.assistant {
+  justify-content: flex-start;
+}
+
+.message-content {
+  max-width: 70%;
+  min-width: 100px;
+}
+
+.message-text {
+  padding: 15px 20px;
+  border-radius: 20px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.message.user .message-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-bottom-right-radius: 8px;
+}
+
+.message.assistant .message-text {
+  background: #f7fafc;
+  color: #2d3748;
+  border: 1px solid #e2e8f0;
+  border-bottom-left-radius: 8px;
+}
+
+.message-time {
+  font-size: 0.7rem;
+  color: #a0aec0;
+  margin-top: 5px;
+  text-align: right;
+}
+
+.message.assistant .message-time {
+  text-align: left;
+}
+
+/* Typing Indicator */
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 15px 20px;
+}
+
+.typing-indicator span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e0;
+  animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes typing {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Error Message */
+.error-message {
+  background: #fed7d7;
+  color: #c53030;
+  padding: 15px 20px;
+  border-radius: 10px;
+  border: 1px solid #feb2b2;
+  text-align: center;
+  margin: 10px 0;
+}
+
+/* Input Styles */
+.chat-input {
+  display: flex;
+  gap: 10px;
+  padding: 20px 25px;
+  background: #f7fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 15px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 25px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.chat-input input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.chat-input input:disabled {
+  background: #edf2f7;
+  color: #a0aec0;
+}
+
+.chat-input button {
+  padding: 15px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: transform 0.2s ease;
+  min-width: 60px;
+}
+
+.chat-input button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.chat-input button:disabled {
+  background: #e2e8f0;
+  color: #a0aec0;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .app {
+    padding: 10px;
+  }
+  
+  .chat-container {
+    height: 90vh;
+    border-radius: 15px;
+  }
+  
+  .role-buttons {
+    flex-direction: column;
+  }
+  
+  .role-card {
+    padding: 30px 20px;
+  }
+  
+  .role-btn {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .role-icon {
+    margin: 0 0 10px 0;
+  }
+  
+  .messages-container {
+    padding: 15px;
+  }
+  
+  .message-content {
+    max-width: 85%;
+  }
+}
+
+/* Scrollbar Styling */
+.messages-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+  background: #f7fafc;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}

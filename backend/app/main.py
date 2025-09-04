@@ -27,6 +27,7 @@ from langchain.tools import BaseTool
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_tavily import TavilySearch
 
 # Environment and utilities
 from dotenv import load_dotenv
@@ -91,6 +92,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., description="User message")
     user_role: str = Field(..., description="User role: security or sales")
     conversation_id: Optional[str] = Field(None, description="Conversation ID for memory")
+    web_search_enabled: Optional[bool] = Field(True, description="Whether web search tool is enabled")
 
 class ChatResponse(BaseModel):
     response: str = Field(..., description="Assistant response")
@@ -184,6 +186,13 @@ def initialize_embeddings_and_llm():
     openai_api_key = os.getenv("OPENAI_API_KEY")
     if not openai_api_key:
         raise ValueError("OPENAI_API_KEY environment variable not set")
+    
+    # Check for Tavily API key (optional for web search)
+    tavily_api_key = os.getenv("TAVILY_API_KEY")
+    if tavily_api_key:
+        logger.info("Tavily API key found - web search capabilities enabled")
+    else:
+        logger.warning("TAVILY_API_KEY not set - web search capabilities disabled")
     
     embeddings = OpenAIEmbeddings(
         model="text-embedding-3-small",
@@ -434,18 +443,98 @@ class LogQueryTool(BaseTool):
             logger.error(f"Error in log query: {e}")
             return f"Error querying logs: {str(e)}"
 
+class WebSearchTool(BaseTool):
+    """Tool for real-time web search using Tavily for any information needs"""
+    name: str = "web_search"
+    description: str = "Search the web for real-time information on any topic including threat intelligence, security news, CVE vulnerabilities, cybersecurity trends, business information, and general knowledge. Use this when users need current, up-to-date information from the internet."
+    
+    def _run(self, query: str, user_role: str = "security") -> str:
+        """Search the web for real-time information on any topic"""
+        try:
+            # Web search is now available to both Security and Sales teams
+            if user_role not in ["security", "sales"]:
+                return "Web search is only available to Security and Sales team members. Please contact your administrator for access."
+            
+            # Check if Tavily API key is available
+            tavily_api_key = os.getenv("TAVILY_API_KEY")
+            if not tavily_api_key:
+                return "Web search capability is not configured. Please contact your administrator to enable threat intelligence features."
+            
+            # Initialize Tavily search with security-focused parameters
+            tavily_search = TavilySearch(
+                max_results=5,
+                topic="general",
+                include_answer=True,  # Get a quick summary
+                include_raw_content=False,  # Keep response concise
+                search_depth="advanced",  # More thorough search for security topics
+                time_range="month"  # Focus on recent threats
+            )
+            
+            # Enhance query based on topic
+            if any(keyword in query.lower() for keyword in ['threat', 'cve', 'vulnerability', 'malware', 'security', 'attack']):
+                enhanced_query = f"cybersecurity threat intelligence {query} vulnerability CVE malware"
+            else:
+                enhanced_query = query
+            
+            # Perform the search
+            search_results = tavily_search.invoke({"query": enhanced_query})
+            
+            if not search_results or "results" not in search_results:
+                return "No search results found for your query. Try rephrasing or being more specific."
+            
+            # Format the response
+            response = "**🔍 Web Search Results:**\n\n"
+            
+            # Add the AI-generated answer if available
+            if search_results.get("answer"):
+                response += f"**Summary:** {search_results['answer']}\n\n"
+            
+            # Add search results
+            results = search_results.get("results", [])
+            if results:
+                response += "**Sources:**\n"
+                for i, result in enumerate(results[:5], 1):
+                    response += f"{i}. **{result.get('title', 'Unknown')}**\n"
+                    response += f"   URL: {result.get('url', 'N/A')}\n"
+                    if result.get('content'):
+                        # Truncate content for readability
+                        content = result['content'][:200] + "..." if len(result['content']) > 200 else result['content']
+                        response += f"   Summary: {content}\n"
+                    response += "\n"
+            
+            # Log the search
+            log_audit_entry(
+                user_role=user_role,
+                action="threat_intelligence_search",
+                query=query,
+                tool_used="threat_intelligence", 
+                result=f"Found {len(results)} threat intelligence sources"
+            )
+            
+            response += "\n**⚠️ Security Note:** Always verify threat intelligence from multiple sources and consult your incident response procedures for any confirmed threats."
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error in threat intelligence search: {e}")
+            return f"Error performing threat intelligence search: {str(e)}"
+
 # ========================
 # AGENT SETUP
 # ========================
 
-def create_security_agent():
+def create_security_agent(web_search_enabled: bool = True):
     """Create LangChain agent with security tools"""
     
-    # Create tools
+    # Create base tools
     tools = [
         PolicySearchTool(),
         LogQueryTool()
     ]
+    
+    # Conditionally add web search tool
+    if web_search_enabled:
+        tools.append(WebSearchTool())
     
     # Create agent with memory
     memory = MemorySaver()
@@ -527,8 +616,8 @@ async def chat_endpoint(request: ChatRequest):
         )
     
     try:
-        # Create agent
-        agent = create_security_agent()
+        # Create agent with web search setting
+        agent = create_security_agent(web_search_enabled=request.web_search_enabled)
         
         # Configuration for conversation
         config = {
@@ -537,18 +626,30 @@ async def chat_endpoint(request: ChatRequest):
             }
         }
         
-        # Prepare messages with system prompt and user query
+        # Prepare messages with system prompt and user query  
+        tools_description = """1. policy_search: Search security policies and handbooks
+2. log_query: Query security logs and events"""
+        
+        if request.web_search_enabled:
+            tools_description += """
+3. web_search: Search the web for real-time information on any topic (available to Security and Sales teams)"""
+            web_search_guidance = """
+- Use web_search tool for current threats, CVEs, business information, general knowledge, or any real-time data
+- For threat intelligence, always remind users to verify information from multiple sources"""
+        else:
+            web_search_guidance = """
+- Web search is currently disabled. Focus on using policy search and log query tools for available information."""
+        
         system_prompt = f"""You are a helpful security assistant. Your role is to help with security-related questions using the available tools.
 
 User Role: {request.user_role}
 
 You have access to the following tools:
-1. policy_search: Search security policies and handbooks
-2. log_query: Query security logs and events
+{tools_description}
 
 Guidelines:
-- Always use the appropriate tool when users ask about policies or logs
-- Pass the user_role parameter to tools: user_role="{request.user_role}"
+- Always use the appropriate tool when users ask about policies, logs, or current information
+- Pass the user_role parameter to tools: user_role="{request.user_role}"{web_search_guidance}
 - Be helpful and provide clear, actionable information
 - If you cannot find information, suggest alternative approaches
 - Do not make up information - only use what you find in the tools

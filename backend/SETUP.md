@@ -7,9 +7,10 @@
    cp env_example.txt .env
    ```
 
-2. **Add your OpenAI API key** to the .env file:
+2. **Add your API keys** to the .env file:
    ```
    OPENAI_API_KEY=sk-your-actual-openai-api-key-here
+   TAVILY_API_KEY=tvly-your-tavily-api-key-here  # Optional for web search
    ```
 
 3. **Run the backend**:
@@ -34,6 +35,7 @@
 2. **Agentic AI Tools**:
    - `PolicySearchTool`: Search security policies with RAG
    - `LogQueryTool`: Query security logs with role-based filtering
+   - `ThreatIntelligenceTool`: Real-time web search for threat intelligence using Tavily
    - LangGraph agent that autonomously decides which tool to use
 
 3. **Security Controls**:
