@@ -232,12 +232,14 @@ const App: React.FC = () => {
       basic: [
         "How should I handle a suspected phishing email?",
         "Show me today's failed login attempts from the logs",
-        "What's the escalation path for a security breach?"
+        "What's the escalation path for a security breach?",
+        "I need to investigate a security incident. Can you show me our incident escalation procedures and also check if there have been any suspicious login attempts in our logs recently?"
       ],
       webSearch: [
         "Research the latest CVE vulnerabilities affecting web applications",
         "Find recent threat intelligence about ransomware attacks",
-        "What are the current cybersecurity trends and threats?"
+        "What are the current security trends and threats?",
+        "We've detected unusual network activity. Show me our incident response policies, check recent security logs for anomalies, and search for the latest information about similar attack patterns."
       ]
     },
     sales: {
@@ -245,11 +247,13 @@ const App: React.FC = () => {
         "How should I handle a suspicious email?",
         "What's our policy for customer data protection?",
         "Show me recent login activity for sales team",
-        "What should I do if I suspect a phishing attempt?"
+        "What should I do if I suspect a phishing attempt?",
+        "A customer is asking about our security practices. Can you show me our security policies and also check if there have been any recent security incidents in our logs that I should be aware of?"
       ],
       webSearch: [
         "Search for recent news about our industry competitors",
-        "Find the latest trends in cybersecurity for sales presentations"
+        "Find the latest trends in security for sales presentations",
+        "A prospect is asking about recent data breaches in our industry. Show me our data protection policies, check our security logs for any incidents, and search for recent industry security news I should be aware of."
       ]
     }
   };

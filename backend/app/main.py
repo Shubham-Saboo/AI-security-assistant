@@ -802,7 +802,7 @@ class LogQueryTool(BaseTool):
 class WebSearchTool(BaseTool):
     """Tool for real-time web search using Tavily for any information needs"""
     name: str = "web_search"
-    description: str = "Search the web for real-time information on any security related topic including threat intelligence, security news, CVE vulnerabilities, cybersecurity trends, business information, and general knowledge. Use this when users need current, up-to-date information from the internet."
+    description: str = "Search the web for real-time information on any security related topic including threat intelligence, security news, CVE vulnerabilities, security trends, business information, and general knowledge. Use this when users need current, up-to-date information from the internet."
     
     @traceable(name="web_search_tool")
     def _run(self, query: str, user_role: str = "security") -> str:
@@ -832,7 +832,7 @@ class WebSearchTool(BaseTool):
             
             # Enhance query based on topic
             if any(keyword in query.lower() for keyword in ['threat', 'cve', 'vulnerability', 'malware', 'security', 'attack']):
-                enhanced_query = f"cybersecurity threat intelligence {query} vulnerability CVE malware"
+                enhanced_query = f"security threat intelligence {query} vulnerability CVE malware"
             else:
                 enhanced_query = query
             
@@ -1071,7 +1071,7 @@ async def chat_endpoint(request: ChatRequest):
   * Security logs and events (use log_query tool)
 - For ANY other topics (current events, general knowledge, non-security questions), politely decline and redirect to security topics."""
         
-        system_prompt = f"""You are an expert security assistant specialized EXCLUSIVELY in enterprise cybersecurity topics. You ONLY answer security-related questions.
+        system_prompt = f"""You are an expert security assistant specialized EXCLUSIVELY in enterprise security topics. You ONLY answer security-related questions.
 
 User Role: {request.user_role}
 
@@ -1079,13 +1079,13 @@ AVAILABLE TOOLS:
 {tools_description}
 
 ABSOLUTE RESTRICTIONS:
-- You ONLY answer questions related to cybersecurity, information security, or IT security
+- You ONLY answer questions related to security, information security, or IT security
 - ALL non-security questions must be politely declined regardless of circumstances
 - You are NOT a general assistant - you are a specialized security consultant ONLY
 
 DECISION FRAMEWORK:
 1. **SECURITY TOPIC VERIFICATION**: Every question must be security-related
-   - ✅ ALLOWED: security policies, procedures, incidents, logs, threats, vulnerabilities, compliance, authentication, access control, cybersecurity
+   - ✅ ALLOWED: security policies, procedures, incidents, logs, threats, vulnerabilities, compliance, authentication, access control, security
    - ❌ FORBIDDEN: weather, sports, politics, general knowledge, entertainment, personal questions, non-security topics
 
 2. **DATA SOURCE SELECTION** (for security questions only):
