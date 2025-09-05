@@ -13,7 +13,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 # FastAPI and web framework
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -24,7 +24,6 @@ from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from langchain.tools import BaseTool
-from langchain_core.prompts import ChatPromptTemplate
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -38,9 +37,7 @@ from langsmith.wrappers import wrap_openai
 from dotenv import load_dotenv
 import chromadb
 import sqlite3
-import uuid
 import re
-from chromadb.config import Settings
 
 # Load environment variables
 load_dotenv()
@@ -467,137 +464,6 @@ class SecurityDecisionTracker:
         else:
             return "Response generated using general AI knowledge."
     
-    def _get_security_analysis(self) -> Dict[str, Any]:
-        """Get security analysis summary"""
-        return {
-            "checks_performed": [
-                {
-                    "check": check_name,
-                    "status": "✅ PASSED" if details["passed"] else "❌ FAILED",
-                    "reason": details["reason"]
-                }
-                for check_name, details in self.security_checks.items()
-            ],
-            "overall_status": "SECURE" if all(check["passed"] for check in self.security_checks.values()) else "ISSUES_DETECTED"
-        }
-    
-    def _get_decision_flow(self) -> List[Dict[str, Any]]:
-        """Get processing decision flow"""
-        return [
-            {
-                "step": step["step"],
-                "description": step["description"],
-                "status": step["status"],
-                "duration_ms": round((step["timestamp"] - self.start_time).total_seconds() * 1000, 2)
-            }
-            for step in self.steps
-        ]
-    
-    def _get_tool_justification(self) -> Dict[str, Any]:
-        """Explain tool selection reasoning"""
-        return {
-            "tools_selected": [
-                {
-                    "tool": tool_name,
-                    "justification": details["reason"],
-                    "confidence": f"{details['confidence']:.1%}" if details['confidence'] > 0 else "N/A",
-                    "results_found": details["results_count"]
-                }
-                for tool_name, details in self.tool_usage.items()
-            ],
-            "selection_strategy": self._get_tool_selection_strategy()
-        }
-    
-    def _get_tool_selection_strategy(self) -> str:
-        """Explain overall tool selection strategy"""
-        if not self.tool_usage:
-            return "No external tools required - answered from general knowledge"
-        
-        strategies = []
-        if "policy_search" in self.tool_usage:
-            strategies.append("policy-based (internal documents)")
-        if "log_query" in self.tool_usage:
-            strategies.append("log analysis (historical data)")
-        if "web_search" in self.tool_usage:
-            strategies.append("web search (real-time data)")
-        
-        return f"Multi-tool approach: {', '.join(strategies)}"
-    
-    def _get_data_sources_explanation(self) -> List[Dict[str, Any]]:
-        """Explain data sources and their relevance"""
-        return [
-            {
-                "source": source["source"],
-                "relevance": source["relevance"],
-                "access_level": source["access_level"]
-            }
-            for source in self.data_sources
-        ]
-    
-    def _get_access_control_explanation(self) -> Dict[str, Any]:
-        """Explain access control decisions"""
-        return {
-            "decisions": [
-                {
-                    "resource": resource,
-                    "access": "✅ GRANTED" if details["granted"] else "❌ DENIED",
-                    "reason": details["reason"]
-                }
-                for resource, details in self.access_decisions.items()
-            ],
-            "rbac_summary": f"Role-based access control applied for user role"
-        }
-    
-    def _get_confidence_assessment(self) -> Dict[str, Any]:
-        """Calculate and explain confidence levels"""
-        if not self.tool_usage:
-            return {
-                "overall_confidence": "Medium",
-                "basis": "General knowledge base",
-                "limitations": "No specific documentation consulted"
-            }
-        
-        avg_confidence = sum(details["confidence"] for details in self.tool_usage.values()) / len(self.tool_usage)
-        
-        if avg_confidence >= 0.8:
-            confidence_level = "High"
-        elif avg_confidence >= 0.5:
-            confidence_level = "Medium"
-        else:
-            confidence_level = "Low"
-        
-        return {
-            "overall_confidence": confidence_level,
-            "confidence_score": f"{avg_confidence:.1%}",
-            "basis": f"Based on {len(self.data_sources)} data sources",
-            "limitations": self._get_confidence_limitations()
-        }
-    
-    def _get_confidence_limitations(self) -> str:
-        """Identify confidence limitations"""
-        limitations = []
-        
-        if not any("web_search" in tool for tool in self.tool_usage):
-            limitations.append("no real-time data consulted")
-        
-        if len(self.data_sources) < 2:
-            limitations.append("limited data sources")
-        
-        if not limitations:
-            return "No significant limitations identified"
-        
-        return ', '.join(limitations)
-    
-    def _filter_explanation_for_role(self, explanation: Dict, user_role: str) -> Dict:
-        """Filter explanation details based on user role"""
-        if user_role == "sales":
-            # Remove sensitive security details for sales users
-            explanation["security_analysis"] = {
-                "overall_status": explanation["security_analysis"]["overall_status"],
-                "note": "Detailed security checks available to security team only"
-            }
-        
-        return explanation
 
 # Global transparency tracker will be initialized in startup
 
