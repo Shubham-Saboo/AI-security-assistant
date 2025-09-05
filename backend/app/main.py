@@ -976,6 +976,22 @@ async def health_check():
         }
     }
 
+@app.post("/new-conversation")
+async def start_new_conversation(request: dict):
+    """Start a new conversation and return a conversation ID"""
+    import uuid
+    conversation_id = str(uuid.uuid4())
+    
+    # Log the new conversation start
+    log_audit_entry(
+        user_role=request.get("user_role", "unknown"),
+        action="new_conversation_started",
+        query="New conversation initiated",
+        result=f"Conversation ID: {conversation_id}"
+    )
+    
+    return {"conversation_id": conversation_id}
+
 @app.post("/chat", response_model=ChatResponse)
 @traceable(name="security_assistant_chat")
 async def chat_endpoint(request: ChatRequest):
