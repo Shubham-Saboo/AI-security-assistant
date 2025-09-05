@@ -40,7 +40,7 @@ import sqlite3
 import re
 
 # Load environment variables
-load_dotenv()
+load_dotenv(dotenv_path="../.env")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
