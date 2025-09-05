@@ -143,6 +143,8 @@ temp/
 logs
 *.log
 *.log.*
+server.log
+backend/server.log
 
 # Runtime data
 pids
