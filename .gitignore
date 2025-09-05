@@ -140,7 +140,6 @@ tmp/
 temp/
 
 # Logs
-logs
 *.log
 *.log.*
 server.log

@@ -1,0 +1,16 @@
+timestamp,user_id,username,action,result,ip_address,user_agent,risk_score,department
+2024-01-15 09:15:23,u001,john.doe,login,success,192.168.1.100,Mozilla/5.0,low,engineering
+2024-01-15 09:16:45,u002,jane.smith,login,failed,10.0.0.50,Mozilla/5.0,medium,sales
+2024-01-15 09:17:12,u002,jane.smith,login,failed,10.0.0.50,Mozilla/5.0,high,sales
+2024-01-15 09:18:00,u003,admin,file_access,success,192.168.1.10,curl/7.68.0,low,security
+2024-01-15 09:20:15,u004,bob.wilson,password_reset,success,203.0.113.45,Mozilla/5.0,medium,marketing
+2024-01-15 09:22:30,u005,alice.brown,login,success,192.168.1.150,Mozilla/5.0,low,engineering
+2024-01-15 09:25:45,u006,suspicious_user,login,failed,198.51.100.25,bot/1.0,critical,unknown
+2024-01-15 09:28:12,u007,charlie.davis,file_download,success,192.168.1.200,Mozilla/5.0,low,sales
+2024-01-15 09:30:00,u008,eve.johnson,privilege_escalation,blocked,172.16.0.100,Mozilla/5.0,critical,engineering
+2024-01-15 09:32:18,u009,frank.miller,data_export,success,192.168.1.50,Mozilla/5.0,medium,security
+2024-01-15 09:35:45,u010,grace.lee,login,success,192.168.1.75,Mozilla/5.0,low,hr
+2024-01-15 09:38:22,u011,hacker123,sql_injection,blocked,203.0.113.100,sqlmap/1.0,critical,unknown
+2024-01-15 09:40:15,u012,ivan.petrov,email_access,success,192.168.1.125,Mozilla/5.0,low,sales
+2024-01-15 09:42:30,u013,julia.wong,vpn_connect,success,10.1.1.50,OpenVPN,low,remote
+2024-01-15 09:45:12,u014,kevin.o_connor,failed_2fa,failed,192.168.1.180,Mozilla/5.0,high,finance
