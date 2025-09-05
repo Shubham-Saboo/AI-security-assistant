@@ -89,10 +89,6 @@ transparency_tracker = None
 # PYDANTIC MODELS
 # ========================
 
-class ChatMessage(BaseModel):
-    role: str = Field(..., description="Role: user or assistant")
-    content: str = Field(..., description="Message content")
-    timestamp: datetime = Field(default_factory=datetime.now)
 
 class ChatRequest(BaseModel):
     message: str = Field(..., description="User message")
@@ -100,12 +96,6 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = Field(None, description="Conversation ID for memory")
     web_search_enabled: Optional[bool] = Field(True, description="Whether web search tool is enabled")
 
-class NewConversationRequest(BaseModel):
-    user_role: str = Field(..., description="User role: security or sales")
-
-class ConversationHistoryRequest(BaseModel):
-    conversation_id: str = Field(..., description="Conversation ID to get history for")
-    user_role: str = Field(..., description="User role: security or sales")
 
 class ChatResponse(BaseModel):
     response: str = Field(..., description="Assistant response")
@@ -150,13 +140,6 @@ def load_rbac_config():
             }
         }
 
-def check_file_access(user_role: str, filename: str) -> bool:
-    """Check if user role has access to specific file"""
-    if user_role not in rbac_config["roles"]:
-        return False
-    
-    accessible_files = rbac_config["roles"][user_role]["accessible_files"]
-    return filename in accessible_files
 
 def detect_prompt_injection(text: str) -> bool:
     """Simple prompt injection detection"""
@@ -385,24 +368,12 @@ class SecurityDecisionTracker:
     
     def reset(self):
         """Reset tracking for new request"""
-        self.steps = []
         self.security_checks = {}
         self.tool_usage = []  # Changed to list to store multiple tool usages
         self.data_sources = []
         self.confidence_scores = {}
         self.access_decisions = {}
-        self.processing_time = 0
-        self.start_time = datetime.now()
     
-    def add_step(self, step_name: str, description: str, status: str = "completed", details: Dict = None):
-        """Add a processing step"""
-        self.steps.append({
-            "step": step_name,
-            "description": description,
-            "status": status,
-            "timestamp": datetime.now(),
-            "details": details or {}
-        })
     
     def add_security_check(self, check_name: str, result: bool, reason: str = ""):
         """Record security check results"""
@@ -439,14 +410,9 @@ class SecurityDecisionTracker:
             "timestamp": datetime.now()
         }
     
-    def finalize(self):
-        """Finalize tracking and calculate metrics"""
-        self.processing_time = (datetime.now() - self.start_time).total_seconds()
     
     def get_explanation(self, user_role: str) -> Dict[str, Any]:
         """Generate simple explanation for the user"""
-        self.finalize()
-        
         # Generate simple transparency explanation
         explanation_text = self._get_simple_explanation()
         
@@ -1040,10 +1006,6 @@ async def chat_endpoint(request: ChatRequest):
     # Initialize transparency tracking
     global transparency_tracker
     transparency_tracker.reset()
-    transparency_tracker.add_step("request_received", f"Processing query from {request.user_role} role")
-    
-    # Security: Check for prompt injection
-    transparency_tracker.add_step("prompt_injection_check", "Scanning for malicious input patterns")
     if detect_prompt_injection(request.message):
         transparency_tracker.add_security_check("prompt_injection", False, "Malicious patterns detected")
         log_audit_entry(
@@ -1087,7 +1049,6 @@ async def chat_endpoint(request: ChatRequest):
     transparency_tracker.add_security_check("security_topic", True, "Security-related question or web search enabled")
     
     # Validate user role
-    transparency_tracker.add_step("rbac_validation", "Validating user role and permissions")
     if request.user_role not in rbac_config["roles"]:
         transparency_tracker.add_security_check("rbac_validation", False, f"Invalid role: {request.user_role}")
         raise HTTPException(
@@ -1100,7 +1061,6 @@ async def chat_endpoint(request: ChatRequest):
     
     try:
         # Create agent with web search setting
-        transparency_tracker.add_step("agent_creation", f"Creating AI agent with web_search={request.web_search_enabled}")
         agent = create_security_agent(web_search_enabled=request.web_search_enabled)
         
         # Configuration for conversation
@@ -1195,7 +1155,6 @@ You are a specialized security assistant - ONLY answer security-related question
             ]
         
         # Run the agent - it will handle conversation state automatically
-        transparency_tracker.add_step("ai_processing", "Executing AI agent with selected tools")
         response = agent.invoke(
             {"messages": input_messages},
             config=config
@@ -1203,10 +1162,8 @@ You are a specialized security assistant - ONLY answer security-related question
         
         # Extract the response
         assistant_message = response["messages"][-1].content
-        transparency_tracker.add_step("response_generated", f"AI generated {len(assistant_message)} character response")
         
         # Apply DLP masking to the assistant's response
-        transparency_tracker.add_step("dlp_processing", "Applying data loss prevention scanning")
         masked_response, dlp_patterns = mask_sensitive_data(assistant_message, request.user_role)
         
         # Log DLP masking if sensitive data was detected in response
@@ -1245,84 +1202,7 @@ You are a specialized security assistant - ONLY answer security-related question
             detail=f"Error processing request: {str(e)}"
         )
 
-@app.post("/new-conversation")
-async def start_new_conversation(request: NewConversationRequest):
-    """Start a new conversation and return conversation ID"""
-    try:
-        # Generate unique conversation ID
-        conversation_id = str(uuid.uuid4())
-        
-        # Log the new conversation
-        log_audit_entry(
-            user_role=request.user_role,
-            action="new_conversation_started",
-            query="",
-            result=f"New conversation started with ID: {conversation_id}"
-        )
-        
-        return {
-            "conversation_id": conversation_id,
-            "message": "New conversation started successfully"
-        }
-        
-    except Exception as e:
-        logger.error(f"Error starting new conversation: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error starting new conversation: {str(e)}"
-        )
 
-@app.post("/conversation-history")
-async def get_conversation_history(request: ConversationHistoryRequest):
-    """Get conversation history for a specific conversation ID"""
-    try:
-        # Create agent to access conversation state
-        agent = create_security_agent()
-        
-        # Configuration for the specific conversation
-        config = {
-            "configurable": {
-                "thread_id": request.conversation_id
-            }
-        }
-        
-        # Get the conversation state
-        try:
-            state = agent.get_state(config)
-            messages = state.values.get("messages", [])
-            
-            # Format messages for frontend
-            formatted_messages = []
-            for msg in messages:
-                if hasattr(msg, 'content') and hasattr(msg, 'type'):
-                    # Skip system messages for cleaner history
-                    if msg.type != "system":
-                        formatted_messages.append({
-                            "role": msg.type,
-                            "content": msg.content,
-                            "timestamp": datetime.now().isoformat()  # Simplified timestamp
-                        })
-            
-            return {
-                "conversation_id": request.conversation_id,
-                "messages": formatted_messages,
-                "total_messages": len(formatted_messages)
-            }
-            
-        except Exception as e:
-            # Conversation doesn't exist or is empty
-            return {
-                "conversation_id": request.conversation_id,
-                "messages": [],
-                "total_messages": 0
-            }
-        
-    except Exception as e:
-        logger.error(f"Error getting conversation history: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting conversation history: {str(e)}"
-        )
 
 @app.get("/audit-logs")
 async def get_audit_logs(user_role: str = "security"):
@@ -1337,17 +1217,6 @@ async def get_audit_logs(user_role: str = "security"):
     recent_logs = audit_log[-50:]  # Last 50 entries
     return {"logs": [log.dict() for log in recent_logs]}
 
-@app.get("/available-documents")
-async def get_available_documents(user_role: str):
-    """Get list of documents accessible to user role"""
-    if user_role not in rbac_config["roles"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid user role"
-        )
-    
-    accessible_files = rbac_config["roles"][user_role]["accessible_files"]
-    return {"accessible_documents": accessible_files}
 
 @app.get("/dlp-status")
 async def get_dlp_status(user_role: str = "security"):
