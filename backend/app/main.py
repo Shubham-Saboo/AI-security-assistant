@@ -179,25 +179,39 @@ def detect_prompt_injection(text: str) -> bool:
     return False
 
 def is_security_related_question(text: str, web_search_enabled: bool) -> bool:
-    """Check if the question is security-related"""
+    """Check if the question is security-related and can be answered from our internal data"""
     if web_search_enabled:
         # When web search is enabled, allow all questions
         return True
     
-    # Security-related keywords
-    security_keywords = [
-        'security', 'phishing', 'malware', 'virus', 'firewall', 'password', 'authentication',
-        'authorization', 'encryption', 'incident', 'breach', 'vulnerability', 'threat',
-        'attack', 'hacker', 'cybersecurity', 'policy', 'compliance', 'audit', 'log',
-        'access', 'permission', 'role', 'vpn', 'ssl', 'tls', 'certificate', 'antivirus',
-        'backup', 'recovery', 'forensics', 'intrusion', 'ddos', 'ransomware', 'trojan',
-        'spyware', 'social engineering', 'two-factor', '2fa', 'mfa', 'zero trust',
-        'endpoint', 'network security', 'data protection', 'privacy', 'gdpr', 'compliance',
-        'risk assessment', 'penetration test', 'security assessment', 'cve', 'patch'
+    # Check for general security questions that shouldn't be answered without web search
+    general_security_patterns = [
+        'what is', 'how does', 'explain', 'define', 'best practices for', 'how to secure',
+        'types of', 'examples of', 'difference between', 'benefits of', 'advantages of',
+        'disadvantages of', 'pros and cons', 'comparison', 'vs', 'versus'
     ]
     
     text_lower = text.lower()
-    return any(keyword in text_lower for keyword in security_keywords)
+    
+    # If it's a general "what is" or "how does" security question, decline it
+    for pattern in general_security_patterns:
+        if pattern in text_lower and any(sec_word in text_lower for sec_word in [
+            'authentication', 'encryption', 'firewall', 'malware', 'virus', 'cybersecurity',
+            'vulnerability', 'threat', 'attack', 'hacker', 'zero trust', 'vpn', 'ssl', 'tls',
+            'ddos', 'ransomware', 'trojan', 'spyware', 'two-factor', '2fa', 'mfa',
+            'penetration test', 'social engineering', 'iot', 'blockchain', 'ai security'
+        ]):
+            return False
+    
+    # Only allow questions about OUR specific policies, procedures, logs, and incidents
+    internal_keywords = [
+        'our policy', 'our procedure', 'company policy', 'company procedure',
+        'our logs', 'our incidents', 'our security', 'show me', 'recent', 'today',
+        'failed login', 'login attempt', 'security incident', 'escalation', 'phishing email',
+        'password policy', 'access control', 'user access', 'incident response'
+    ]
+    
+    return any(keyword in text_lower for keyword in internal_keywords)
 
 # ========================
 # DATA LOSS PREVENTION (DLP)
@@ -1107,42 +1121,51 @@ async def chat_endpoint(request: ChatRequest):
   * Security logs and events (use log_query tool)
 - For ANY other topics (current events, general knowledge, non-security questions), politely decline and redirect to security topics."""
         
-        system_prompt = f"""You are an expert security assistant specialized in enterprise cybersecurity. Your mission is to provide accurate, actionable security guidance using the right tools and data sources.
+        system_prompt = f"""You are an expert security assistant specialized in enterprise cybersecurity. Your mission is to provide accurate, actionable security guidance ONLY from available internal data sources.
 
 User Role: {request.user_role}
 
 AVAILABLE TOOLS:
 {tools_description}
 
+STRICT DATA SOURCE POLICY:
+- You can ONLY answer questions using data from our internal tools
+- If information is not available in our policies or logs, you MUST decline to answer
+- NEVER provide general cybersecurity knowledge if it's not in our internal data sources{web_search_guidance}
+
 DECISION FRAMEWORK:
 1. **SECURITY TOPIC ASSESSMENT**: First, determine if the question is security-related
    - Security topics: policies, procedures, incidents, logs, threats, vulnerabilities, compliance, authentication, access control, etc.
    - Non-security topics: general knowledge, weather, current events, personal questions, etc.
 
-2. **TOOL SELECTION LOGIC** (for security questions only):
-   - **Policy Search**: Use for questions about security policies, procedures, incident response, compliance requirements, security standards
-   - **Log Query**: Use for questions about security events, user activities, login attempts, system logs, security incidents
-   - **Web Search**: Use for current threats, recent CVEs, latest security news, real-time threat intelligence{web_search_guidance}
+2. **DATA AVAILABILITY CHECK**: For security questions, determine if the answer exists in our data sources
+   - **Policy Search**: Questions about OUR security policies, procedures, incident response, compliance requirements
+   - **Log Query**: Questions about OUR security events, user activities, login attempts, system logs, incidents
+   - **Web Search**: Current threats, recent CVEs, latest security news (ONLY when web search is enabled){web_search_guidance}
 
 3. **RESPONSE REQUIREMENTS**:
-   - ALWAYS identify and use the most appropriate tool for the question
-   - CITE the specific data source you used (e.g., "phishing_response.md", "security_logs.csv", "Tavily Web Search")
+   - ONLY answer if the information exists in our internal data sources
+   - If information is not available internally, decline politely and explain what you CAN help with
+   - ALWAYS use the appropriate tool and cite the specific data source
    - Pass user_role="{request.user_role}" to all tools
-   - Provide actionable, specific guidance based on the tool results
 
 CRITICAL INSTRUCTIONS:
 - For NON-SECURITY questions: Politely decline and redirect to security topics
-- For SECURITY questions: Analyze the question type and select the appropriate tool
-- NEVER answer security questions without using tools - always consult the available data sources
-- Always explain what tool you used and why in your response
+- For SECURITY questions NOT answerable from internal data: Decline and explain what you can help with
+- For SECURITY questions answerable from internal data: Use the appropriate tool
+- NEVER provide general security advice or knowledge - ALWAYS check our internal tools first
+- If a tool returns no results, inform the user that the information is not available in our systems
+- DO NOT answer general cybersecurity concepts unless they are explicitly documented in our policies
+- You are NOT a general cybersecurity consultant - you are OUR company's security assistant
 
 EXAMPLES:
-- "How do I handle phishing?" → Use policy_search for procedures
-- "Show me failed login attempts" → Use log_query for security events  
-- "Latest ransomware threats" → Use web_search for current intelligence
-- "What's the weather?" → Decline politely
+- "How do I handle phishing?" → Use policy_search (if we have phishing procedures)
+- "Show me failed login attempts" → Use log_query (check our security logs)
+- "What is two-factor authentication?" → DECLINE if not in our policies (general knowledge)
+- "Latest ransomware threats" → Use web_search ONLY if enabled, otherwise DECLINE
+- "What's our password policy?" → Use policy_search (if we have password policies)
 
-Your expertise lies in security - use the right tools to provide authoritative, data-backed answers."""
+You are a company-specific security assistant - only provide information from OUR data sources."""
 
         # Check if this is a new conversation by trying to get current state
         try:
