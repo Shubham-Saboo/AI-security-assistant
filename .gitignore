@@ -41,6 +41,13 @@ venv.bak/
 chroma_db/
 *.sqlite3
 
+# Conversation memory database files (SQLite)
+*.db
+*.db-shm
+*.db-wal
+conversations.db*
+backend/conversations.db*
+
 # Node.js
 node_modules/
 npm-debug.log*
