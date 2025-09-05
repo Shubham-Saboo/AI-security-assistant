@@ -387,7 +387,7 @@ class SecurityDecisionTracker:
         """Reset tracking for new request"""
         self.steps = []
         self.security_checks = {}
-        self.tool_usage = {}
+        self.tool_usage = []  # Changed to list to store multiple tool usages
         self.data_sources = []
         self.confidence_scores = {}
         self.access_decisions = {}
@@ -414,12 +414,13 @@ class SecurityDecisionTracker:
     
     def add_tool_usage(self, tool_name: str, reason: str, confidence: float = 0.0, results_count: int = 0):
         """Record tool usage and reasoning"""
-        self.tool_usage[tool_name] = {
+        self.tool_usage.append({
+            "tool_name": tool_name,
             "reason": reason,
             "confidence": confidence,
             "results_count": results_count,
             "timestamp": datetime.now()
-        }
+        })
     
     def add_data_source(self, source: str, relevance: str, access_level: str):
         """Record data sources used"""
@@ -458,29 +459,50 @@ class SecurityDecisionTracker:
         if not self.tool_usage and not self.data_sources:
             return "Response generated using general AI knowledge without external tools or data sources."
         
-        # Get tool information
-        tools_used = list(self.tool_usage.keys())
+        # Get tool information from the list
+        tools_used = [tool["tool_name"] for tool in self.tool_usage]
         data_sources = [source["source"] for source in self.data_sources]
         
+        tool_display_map = {
+            "policy_search": "Policy Search tool",
+            "log_query": "Log Query tool", 
+            "web_search": "Web Search tool"
+        }
+        
         if tools_used and data_sources:
-            tool_name = tools_used[0]  # Primary tool used
-            source_name = data_sources[0]  # Primary data source
+            # Handle multiple tools
+            unique_tools = list(dict.fromkeys(tools_used))  # Remove duplicates while preserving order
+            tool_displays = [tool_display_map.get(tool, tool) for tool in unique_tools]
             
-            tool_display = {
-                "policy_search": "Policy Search tool",
-                "log_query": "Log Query tool", 
-                "web_search": "Web Search tool"
-            }.get(tool_name, tool_name)
+            # Format tools string
+            if len(tool_displays) == 1:
+                tools_str = tool_displays[0]
+            elif len(tool_displays) == 2:
+                tools_str = f"{tool_displays[0]} and {tool_displays[1]}"
+            else:
+                tools_str = ", ".join(tool_displays[:-1]) + f", and {tool_displays[-1]}"
             
-            return f"Response generated using {tool_display} based on {source_name}."
+            # Format sources string
+            unique_sources = list(dict.fromkeys(data_sources))  # Remove duplicates
+            if len(unique_sources) == 1:
+                sources_str = unique_sources[0]
+            else:
+                sources_str = ", ".join(unique_sources)
+            
+            return f"Response generated using {tools_str} based on {sources_str}."
+            
         elif tools_used:
-            tool_name = tools_used[0]
-            tool_display = {
-                "policy_search": "Policy Search tool",
-                "log_query": "Log Query tool",
-                "web_search": "Web Search tool" 
-            }.get(tool_name, tool_name)
-            return f"Response generated using {tool_display}."
+            # Tools without specific data sources
+            unique_tools = list(dict.fromkeys(tools_used))
+            tool_displays = [tool_display_map.get(tool, tool) for tool in unique_tools]
+            
+            if len(tool_displays) == 1:
+                return f"Response generated using {tool_displays[0]}."
+            elif len(tool_displays) == 2:
+                return f"Response generated using {tool_displays[0]} and {tool_displays[1]}."
+            else:
+                tools_str = ", ".join(tool_displays[:-1]) + f", and {tool_displays[-1]}"
+                return f"Response generated using {tools_str}."
         else:
             return "Response generated using general AI knowledge."
     
