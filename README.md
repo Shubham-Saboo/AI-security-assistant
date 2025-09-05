@@ -9,34 +9,42 @@ This is a complete full-stack application demonstrating advanced AI capabilities
 ### 🏗️ Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   React Frontend │    │  FastAPI Backend │    │  AI & Data Layer │
-│                 │    │                 │    │                 │
+┌─────────────────┐    ┌─────────────────-┐    ┌─────────────────┐
+│  React Frontend │    │ FastAPI Backend  │    │ AI & Data Layer │
+│                 │    │                  │    │                 │
 │ • Chat Interface│◄──►│ • LangGraph Agent│◄──►│ • OpenAI GPT-4o │
 │ • Role Selection│    │ • Security Tools │    │ • ChromaDB (RAG)│
-│ • Transparency  │    │ • RBAC & Audit  │    │ • Tavily Search │
-│ • Web Controls  │    │ • DLP & Masking │    │ • LangSmith     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+│ • Transparency  │    │ • RBAC & Audit   │    │ • Tavily Search │
+│ • Web Controls  │    │ • DLP & Masking  │    │ • LangSmith     │
+└─────────────────┘    └─────────────────-┘    └─────────────────┘
 ```
 
 ## 🚀 Quick Start for Interviewers
 
-### ⚡ One-Command Setup
+### ⚡ One-Command Setup & Start
 
 ```bash
 # Clone and setup everything
 git clone https://github.com/Shubham-Saboo/AI-security-assistant.git
 cd AI-security-assistant
-chmod +x setup-for-interview.sh
-./setup-for-interview.sh
+chmod +x start.sh
+
+# Initial setup (first time only)
+./start.sh setup
+
+# Start the application
+./start.sh
 ```
 
-This will:
-1. 🐍 Create Python virtual environment
-2. 📦 Install all dependencies  
-3. 🔧 Setup sample configuration
-4. 🚀 Start both backend and frontend
-5. 🧪 Run initial tests
+**Single Script Commands:**
+- `./start.sh setup` - Initial environment setup
+- `./start.sh` - Start both backend and frontend  
+- `./start.sh backend` - Start backend only
+- `./start.sh frontend` - Start frontend only
+- `./start.sh status` - Check service status
+- `./start.sh stop` - Stop all services
+- `./start.sh restart` - Restart everything
+- `./start.sh --help` - Show all options
 
 **Access the application at:** http://localhost:3000
 

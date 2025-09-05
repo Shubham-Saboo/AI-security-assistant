@@ -4,10 +4,17 @@
 
 ## 🚀 Quick Start
 
-1. **Setup**: Run `./setup-for-interview.sh`
-2. **Start**: Run `./start-all.sh`  
+1. **Setup**: Run `./start.sh setup` (first time only)
+2. **Start**: Run `./start.sh`  
 3. **Access**: http://localhost:3000
 4. **Follow scenarios below** ⬇️
+
+**Additional Commands:**
+- `./start.sh status` - Check if services are running
+- `./start.sh backend` - Start backend only
+- `./start.sh frontend` - Start frontend only  
+- `./start.sh stop` - Stop all services
+- `./start.sh restart` - Restart everything
 
 ---
 

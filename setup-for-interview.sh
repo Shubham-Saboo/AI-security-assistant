@@ -229,9 +229,10 @@ if grep -q "your_openai_api_key_here" backend/.env; then
 fi
 
 echo "🚀 2. Start the application:"
-echo "   ./start-all.sh                    # Start both backend and frontend"
-echo "   ./start-backend.sh                # Start backend only"  
-echo "   ./start-frontend.sh               # Start frontend only"
+echo "   ./start.sh                        # Start both backend and frontend"
+echo "   ./start.sh backend                # Start backend only"  
+echo "   ./start.sh frontend               # Start frontend only"
+echo "   ./start.sh status                 # Check service status"
 echo ""
 
 echo "🌐 3. Access the application:"
