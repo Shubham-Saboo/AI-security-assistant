@@ -368,28 +368,16 @@ class SecurityDecisionTracker:
     
     def reset(self):
         """Reset tracking for new request"""
-        self.security_checks = {}
-        self.tool_usage = []  # Changed to list to store multiple tool usages
+        self.tool_usage = []  # Store multiple tool usages
         self.data_sources = []
-        self.confidence_scores = {}
-        self.access_decisions = {}
     
     
-    def add_security_check(self, check_name: str, result: bool, reason: str = ""):
-        """Record security check results"""
-        self.security_checks[check_name] = {
-            "passed": result,
-            "reason": reason,
-            "timestamp": datetime.now()
-        }
     
-    def add_tool_usage(self, tool_name: str, reason: str, confidence: float = 0.0, results_count: int = 0):
+    def add_tool_usage(self, tool_name: str, reason: str):
         """Record tool usage and reasoning"""
         self.tool_usage.append({
             "tool_name": tool_name,
             "reason": reason,
-            "confidence": confidence,
-            "results_count": results_count,
             "timestamp": datetime.now()
         })
     
@@ -402,13 +390,6 @@ class SecurityDecisionTracker:
             "timestamp": datetime.now()
         })
     
-    def add_access_decision(self, resource: str, granted: bool, reason: str):
-        """Record access control decisions"""
-        self.access_decisions[resource] = {
-            "granted": granted,
-            "reason": reason,
-            "timestamp": datetime.now()
-        }
     
     
     def get_explanation(self, user_role: str) -> Dict[str, Any]:
@@ -698,11 +679,11 @@ class PolicySearchTool(BaseTool):
             docs = search_documents_by_role(query, user_role, k=3)
             
             if not docs:
-                transparency_tracker.add_tool_usage("policy_search", "No matching documents found", confidence=0.0, results_count=0)
+                transparency_tracker.add_tool_usage("policy_search", "No matching documents found")
                 return "No relevant policy documents found for your query."
             
             # Add transparency tracking for successful search
-            transparency_tracker.add_tool_usage("policy_search", f"Found {len(docs)} relevant policy documents", confidence=0.9, results_count=len(docs))
+            transparency_tracker.add_tool_usage("policy_search", f"Found {len(docs)} relevant policy documents")
             
             # Format response
             response = "Found relevant policy information:\n\n"
@@ -715,7 +696,6 @@ class PolicySearchTool(BaseTool):
                 # Add data source tracking
                 accessibility = "role-filtered" if user_role in doc.metadata.get("accessible_roles", "").split(",") else "unrestricted"
                 transparency_tracker.add_data_source(source_file, "high", accessibility)
-                transparency_tracker.add_access_decision(source_file, True, f"Document accessible to {user_role} role")
                 
                 response += f"**Source {i}: {source_file}**\n"
                 response += f"{doc.page_content}\n\n"
@@ -784,13 +764,12 @@ class LogQueryTool(BaseTool):
             filtered_df = filtered_df.head(10)
             
             if filtered_df.empty:
-                transparency_tracker.add_tool_usage("log_query", "No matching log entries found", confidence=0.0, results_count=0)
+                transparency_tracker.add_tool_usage("log_query", "No matching log entries found")
                 return "No matching log entries found for your query."
             
             # Add transparency tracking for successful search
-            transparency_tracker.add_tool_usage("log_query", f"Found {len(filtered_df)} security log entries", confidence=0.9, results_count=len(filtered_df))
+            transparency_tracker.add_tool_usage("log_query", f"Found {len(filtered_df)} security log entries")
             transparency_tracker.add_data_source("security_logs.csv", "high", f"role-filtered ({user_role})")
-            transparency_tracker.add_access_decision("security_logs.csv", True, f"Log access granted to {user_role} role")
             
             # Format response
             response = f"Found {len(filtered_df)} log entries:\n\n"
@@ -861,14 +840,13 @@ class WebSearchTool(BaseTool):
             search_results = tavily_search.invoke({"query": enhanced_query})
             
             if not search_results or "results" not in search_results:
-                transparency_tracker.add_tool_usage("web_search", "No search results found", confidence=0.0, results_count=0)
+                transparency_tracker.add_tool_usage("web_search", "No search results found")
                 return "No search results found for your query. Try rephrasing or being more specific."
             
             # Add transparency tracking for successful search
             results_count = len(search_results.get("results", []))
-            transparency_tracker.add_tool_usage("web_search", f"Found {results_count} web search results", confidence=0.8, results_count=results_count)
+            transparency_tracker.add_tool_usage("web_search", f"Found {results_count} web search results")
             transparency_tracker.add_data_source("Tavily Web Search", "real-time", "public web sources")
-            transparency_tracker.add_access_decision("web_search", True, f"Web search enabled for {user_role} role")
             
             # Format the response
             response = "**🔍 Web Search Results:**\n\n"
@@ -1007,7 +985,6 @@ async def chat_endpoint(request: ChatRequest):
     global transparency_tracker
     transparency_tracker.reset()
     if detect_prompt_injection(request.message):
-        transparency_tracker.add_security_check("prompt_injection", False, "Malicious patterns detected")
         log_audit_entry(
             user_role=request.user_role,
             action="prompt_injection_detected",
@@ -1019,11 +996,8 @@ async def chat_endpoint(request: ChatRequest):
             detail="Potentially malicious input detected. Please rephrase your question."
         )
     
-    transparency_tracker.add_security_check("prompt_injection", True, "No malicious patterns found")
-    
     # Security: Check if question is security-related when web search is disabled
     if not is_security_related_question(request.message, request.web_search_enabled):
-        transparency_tracker.add_security_check("security_topic", False, "Non-security question with web search disabled")
         
         decline_message = ("I'm a specialized security assistant focused on helping with security policies and logs. "
                           "I can't answer general questions like that. Instead, I can help you with security procedures, "
@@ -1046,18 +1020,12 @@ async def chat_endpoint(request: ChatRequest):
             transparency=transparency_explanation
         )
     
-    transparency_tracker.add_security_check("security_topic", True, "Security-related question or web search enabled")
-    
     # Validate user role
     if request.user_role not in rbac_config["roles"]:
-        transparency_tracker.add_security_check("rbac_validation", False, f"Invalid role: {request.user_role}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid user role"
         )
-    
-    transparency_tracker.add_security_check("rbac_validation", True, f"Valid role: {request.user_role}")
-    transparency_tracker.add_access_decision("system_access", True, f"Role {request.user_role} authorized")
     
     try:
         # Create agent with web search setting
@@ -1168,10 +1136,7 @@ You are a specialized security assistant - ONLY answer security-related question
         
         # Log DLP masking if sensitive data was detected in response
         if dlp_patterns:
-            transparency_tracker.add_security_check("dlp_masking", True, f"Masked {len(dlp_patterns)} sensitive data patterns")
             log_dlp_event(request.user_role, dlp_patterns, f"AI Response: {assistant_message[:50]}")
-        else:
-            transparency_tracker.add_security_check("dlp_masking", True, "No sensitive data detected")
         
         # Extract tool calls from response (simplified)
         tool_calls = []
