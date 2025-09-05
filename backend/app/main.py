@@ -1012,30 +1012,6 @@ async def chat_endpoint(request: ChatRequest):
             detail="Potentially malicious input detected. Please rephrase your question."
         )
     
-    # Security: Check if question is security-related when web search is disabled
-    if not is_security_related_question(request.message, request.web_search_enabled):
-        
-        decline_message = ("I'm a specialized security assistant focused on helping with security policies and logs. "
-                          "I can't answer general questions like that. Instead, I can help you with security procedures, "
-                          "incident response, or analyze security logs. What security topic can I assist you with?")
-        
-        log_audit_entry(
-            user_role=request.user_role,
-            action="non_security_question_declined",
-            query=request.message,
-            result=decline_message
-        )
-        
-        # Generate transparency explanation for declined request
-        transparency_explanation = transparency_tracker.get_explanation(request.user_role)
-        
-        return ChatResponse(
-            response=decline_message,
-            sources=[],
-            tool_calls=[],
-            transparency=transparency_explanation
-        )
-    
     # Validate user role
     if request.user_role not in rbac_config["roles"]:
         raise HTTPException(
@@ -1047,13 +1023,36 @@ async def chat_endpoint(request: ChatRequest):
         # Create agent with web search setting
         agent = create_security_agent(web_search_enabled=request.web_search_enabled)
         
-        # Configuration for conversation
-        config = {
-            "configurable": {
-                "thread_id": request.conversation_id or "default"
-            },
-            "recursion_limit": 10
-        }
+        # Set up conversation configuration
+        config = {"configurable": {"thread_id": request.conversation_id}, "recursion_limit": 10}
+        
+        # Check if this is a continuing conversation by checking existing state
+        current_state = agent.get_state(config)
+        has_conversation_history = bool(current_state.values.get("messages", []))
+        
+        # Security: Check if question is security-related (skip check for follow-up questions in existing conversations)
+        if not has_conversation_history and not is_security_related_question(request.message, request.web_search_enabled):
+            
+            decline_message = ("I'm a specialized security assistant focused on helping with security policies and logs. "
+                              "I can't answer general questions like that. Instead, I can help you with security procedures, "
+                              "incident response, or analyze security logs. What security topic can I assist you with?")
+            
+            log_audit_entry(
+                user_role=request.user_role,
+                action="non_security_question_declined",
+                query=request.message,
+                result=decline_message
+            )
+            
+            # Generate transparency explanation for declined request
+            transparency_explanation = transparency_tracker.get_explanation(request.user_role)
+            
+            return ChatResponse(
+                response=decline_message,
+                sources=[],
+                tool_calls=[],
+                transparency=transparency_explanation
+            )
         
         # Prepare messages with system prompt and user query  
         tools_description = """1. policy_search: Search security policies and handbooks
