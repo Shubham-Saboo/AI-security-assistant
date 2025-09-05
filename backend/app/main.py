@@ -178,6 +178,27 @@ def detect_prompt_injection(text: str) -> bool:
             return True
     return False
 
+def is_security_related_question(text: str, web_search_enabled: bool) -> bool:
+    """Check if the question is security-related"""
+    if web_search_enabled:
+        # When web search is enabled, allow all questions
+        return True
+    
+    # Security-related keywords
+    security_keywords = [
+        'security', 'phishing', 'malware', 'virus', 'firewall', 'password', 'authentication',
+        'authorization', 'encryption', 'incident', 'breach', 'vulnerability', 'threat',
+        'attack', 'hacker', 'cybersecurity', 'policy', 'compliance', 'audit', 'log',
+        'access', 'permission', 'role', 'vpn', 'ssl', 'tls', 'certificate', 'antivirus',
+        'backup', 'recovery', 'forensics', 'intrusion', 'ddos', 'ransomware', 'trojan',
+        'spyware', 'social engineering', 'two-factor', '2fa', 'mfa', 'zero trust',
+        'endpoint', 'network security', 'data protection', 'privacy', 'gdpr', 'compliance',
+        'risk assessment', 'penetration test', 'security assessment', 'cve', 'patch'
+    ]
+    
+    text_lower = text.lower()
+    return any(keyword in text_lower for keyword in security_keywords)
+
 # ========================
 # DATA LOSS PREVENTION (DLP)
 # ========================
@@ -1017,6 +1038,33 @@ async def chat_endpoint(request: ChatRequest):
     
     transparency_tracker.add_security_check("prompt_injection", True, "No malicious patterns found")
     
+    # Security: Check if question is security-related when web search is disabled
+    if not is_security_related_question(request.message, request.web_search_enabled):
+        transparency_tracker.add_security_check("security_topic", False, "Non-security question with web search disabled")
+        
+        decline_message = ("I'm a specialized security assistant focused on helping with security policies and logs. "
+                          "I can't answer general questions like that. Instead, I can help you with security procedures, "
+                          "incident response, or analyze security logs. What security topic can I assist you with?")
+        
+        log_audit_entry(
+            user_role=request.user_role,
+            action="non_security_question_declined",
+            query=request.message,
+            result=decline_message
+        )
+        
+        # Generate transparency explanation for declined request
+        transparency_explanation = transparency_tracker.get_explanation(request.user_role)
+        
+        return ChatResponse(
+            response=decline_message,
+            sources=[],
+            tool_calls=[],
+            transparency=transparency_explanation
+        )
+    
+    transparency_tracker.add_security_check("security_topic", True, "Security-related question or web search enabled")
+    
     # Validate user role
     transparency_tracker.add_step("rbac_validation", "Validating user role and permissions")
     if request.user_role not in rbac_config["roles"]:
@@ -1038,7 +1086,8 @@ async def chat_endpoint(request: ChatRequest):
         config = {
             "configurable": {
                 "thread_id": request.conversation_id or "default"
-            }
+            },
+            "recursion_limit": 10
         }
         
         # Prepare messages with system prompt and user query  
@@ -1053,23 +1102,47 @@ async def chat_endpoint(request: ChatRequest):
 - For threat intelligence, always remind users to verify information from multiple sources"""
         else:
             web_search_guidance = """
-- Web search is currently disabled. Focus on using policy search and log query tools for available information."""
+- Web search is currently disabled. You can ONLY answer questions about:
+  * Security policies and procedures (use policy_search tool)
+  * Security logs and events (use log_query tool)
+- For ANY other topics (current events, general knowledge, non-security questions), politely decline and redirect to security topics."""
         
-        system_prompt = f"""You are a helpful security assistant. Your role is to help with security-related questions using the available tools.
+        system_prompt = f"""You are an expert security assistant specialized in enterprise cybersecurity. Your mission is to provide accurate, actionable security guidance using the right tools and data sources.
 
 User Role: {request.user_role}
 
-You have access to the following tools:
+AVAILABLE TOOLS:
 {tools_description}
 
-Guidelines:
-- Always use the appropriate tool when users ask about policies, logs, or current information
-- Pass the user_role parameter to tools: user_role="{request.user_role}"{web_search_guidance}
-- Be helpful and provide clear, actionable information
-- If you cannot find information, suggest alternative approaches
-- Do not make up information - only use what you find in the tools
+DECISION FRAMEWORK:
+1. **SECURITY TOPIC ASSESSMENT**: First, determine if the question is security-related
+   - Security topics: policies, procedures, incidents, logs, threats, vulnerabilities, compliance, authentication, access control, etc.
+   - Non-security topics: general knowledge, weather, current events, personal questions, etc.
 
-Remember: You are helping with enterprise security, so be professional and accurate."""
+2. **TOOL SELECTION LOGIC** (for security questions only):
+   - **Policy Search**: Use for questions about security policies, procedures, incident response, compliance requirements, security standards
+   - **Log Query**: Use for questions about security events, user activities, login attempts, system logs, security incidents
+   - **Web Search**: Use for current threats, recent CVEs, latest security news, real-time threat intelligence{web_search_guidance}
+
+3. **RESPONSE REQUIREMENTS**:
+   - ALWAYS identify and use the most appropriate tool for the question
+   - CITE the specific data source you used (e.g., "phishing_response.md", "security_logs.csv", "Tavily Web Search")
+   - Pass user_role="{request.user_role}" to all tools
+   - Provide actionable, specific guidance based on the tool results
+
+CRITICAL INSTRUCTIONS:
+- For NON-SECURITY questions: Politely decline and redirect to security topics
+- For SECURITY questions: Analyze the question type and select the appropriate tool
+- NEVER answer security questions without using tools - always consult the available data sources
+- Always explain what tool you used and why in your response
+
+EXAMPLES:
+- "How do I handle phishing?" → Use policy_search for procedures
+- "Show me failed login attempts" → Use log_query for security events  
+- "Latest ransomware threats" → Use web_search for current intelligence
+- "What's the weather?" → Decline politely
+
+Your expertise lies in security - use the right tools to provide authoritative, data-backed answers."""
 
         # Check if this is a new conversation by trying to get current state
         try:
