@@ -373,57 +373,15 @@ const App: React.FC = () => {
                   {renderMarkdown(message.content)}
                 </div>
                 
-                {/* Transparency explanation for assistant messages */}
+                {/* Simple transparency explanation for assistant messages */}
                 {message.role === 'assistant' && message.transparency && (
                   <div className="transparency-section">
-                    <details className="transparency-details">
-                      <summary className="transparency-summary">
-                        🔍 Why did I answer this way? (Security Transparency)
-                      </summary>
-                      <div className="transparency-content">
-                        <div className="transparency-item">
-                          <strong>📊 Processing Summary:</strong>
-                          <ul>
-                            <li>Steps: {message.transparency.processing_summary?.total_steps || 'N/A'}</li>
-                            <li>Processing time: {message.transparency.processing_summary?.processing_time_ms || 'N/A'}ms</li>
-                            <li>Security checks passed: {message.transparency.processing_summary?.security_checks_passed || 'N/A'}</li>
-                            <li>Tools used: {message.transparency.processing_summary?.tools_used || 'N/A'}</li>
-                          </ul>
-                        </div>
-                        
-                        <div className="transparency-item">
-                          <strong>🛡️ Security Status:</strong>
-                          <span className={`security-status ${message.transparency.security_analysis?.overall_status?.toLowerCase()}`}>
-                            {message.transparency.security_analysis?.overall_status || 'Unknown'}
-                          </span>
-                        </div>
-                        
-                        {message.transparency.tool_justification?.tools_selected?.length > 0 && (
-                          <div className="transparency-item">
-                            <strong>🔧 Tools Used:</strong>
-                            <ul>
-                              {message.transparency.tool_justification.tools_selected.map((tool: any, idx: number) => (
-                                <li key={idx}>
-                                  <strong>{tool.tool}</strong>: {tool.justification} 
-                                  {tool.confidence !== 'N/A' && <span className="confidence"> (Confidence: {tool.confidence})</span>}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        
-                        {message.transparency.confidence_assessment && (
-                          <div className="transparency-item">
-                            <strong>📈 Confidence Assessment:</strong>
-                            <div>Overall: {message.transparency.confidence_assessment.overall_confidence}</div>
-                            <div>Basis: {message.transparency.confidence_assessment.basis}</div>
-                            {message.transparency.confidence_assessment.limitations && (
-                              <div>Limitations: {message.transparency.confidence_assessment.limitations}</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </details>
+                    <div className="transparency-simple">
+                      <span className="transparency-icon">🔍</span>
+                      <span className="transparency-text">
+                        {message.transparency.explanation || 'Response generated using AI knowledge.'}
+                      </span>
+                    </div>
                   </div>
                 )}
                 

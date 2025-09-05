@@ -10,7 +10,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
   min-height: 100vh;
 }
 
@@ -334,88 +334,31 @@ body {
 
 /* Transparency Styles */
 .transparency-section {
-  margin-top: 15px;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 8px;
-  border-left: 4px solid #3b82f6;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 6px;
+  border-left: 3px solid #3b82f6;
 }
 
-.transparency-details {
-  margin: 0;
+.transparency-simple {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.transparency-summary {
-  cursor: pointer;
-  font-weight: 500;
-  color: #3b82f6;
-  margin-bottom: 10px;
-  user-select: none;
-  list-style: none;
-  outline: none;
+.transparency-icon {
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
-.transparency-summary::-webkit-details-marker {
-  display: none;
-}
-
-.transparency-summary::before {
-  content: "▶ ";
-  display: inline-block;
-  transition: transform 0.2s ease;
-}
-
-.transparency-details[open] .transparency-summary::before {
-  transform: rotate(90deg);
-}
-
-.transparency-content {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.transparency-item {
-  margin-bottom: 12px;
-}
-
-.transparency-item strong {
-  color: #1f2937;
-  display: block;
-  margin-bottom: 4px;
-}
-
-.transparency-item ul {
-  margin: 5px 0 0 15px;
-  padding: 0;
-}
-
-.transparency-item li {
-  margin-bottom: 3px;
+.transparency-text {
+  font-size: 13px;
   color: #4b5563;
+  font-style: italic;
+  line-height: 1.4;
 }
 
-.security-status {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-weight: 500;
-  font-size: 0.9em;
-}
-
-.security-status.secure {
-  background: rgba(34, 197, 94, 0.2);
-  color: #059669;
-}
-
-.security-status.issues_detected {
-  background: rgba(239, 68, 68, 0.2);
-  color: #dc2626;
-}
-
-.confidence {
-  color: #6b7280;
-  font-size: 0.9em;
-}
 
 /* Messages Styles */
 .messages-container {
@@ -491,8 +434,9 @@ body {
 }
 
 .message.user .message-text {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, #dbeafe 0%, #e9d5ff 100%);
+  color: #1f2937;
+  border: 1px solid #c7d2fe;
   border-bottom-right-radius: 8px;
 }
 

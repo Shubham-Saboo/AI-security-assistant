@@ -86,6 +86,7 @@ vector_store = None
 llm = None
 rbac_config = {}
 audit_log = []
+transparency_tracker = None
 
 # ========================
 # PYDANTIC MODELS
@@ -425,31 +426,46 @@ class SecurityDecisionTracker:
         self.processing_time = (datetime.now() - self.start_time).total_seconds()
     
     def get_explanation(self, user_role: str) -> Dict[str, Any]:
-        """Generate comprehensive explanation for the user"""
+        """Generate simple explanation for the user"""
         self.finalize()
         
-        explanation = {
-            "processing_summary": {
-                "total_steps": len(self.steps),
-                "processing_time_ms": round(self.processing_time * 1000, 2),
-                "security_checks_passed": sum(1 for check in self.security_checks.values() if check["passed"]),
-                "tools_used": len(self.tool_usage),
-                "data_sources": len(self.data_sources)
-            },
-            "security_analysis": self._get_security_analysis(),
-            "decision_flow": self._get_decision_flow(),
-            "tool_justification": self._get_tool_justification(),
-            "data_sources": self._get_data_sources_explanation(),
-            "access_control": self._get_access_control_explanation(),
-            "confidence_assessment": self._get_confidence_assessment()
+        # Generate simple transparency explanation
+        explanation_text = self._get_simple_explanation()
+        
+        return {
+            "explanation": explanation_text
         }
+    
+    def _get_simple_explanation(self) -> str:
+        """Generate a simple one-sentence explanation of tool usage and data sources"""
+        if not self.tool_usage and not self.data_sources:
+            return "Response generated using general AI knowledge without external tools or data sources."
         
-        # Role-based explanation filtering
-        if user_role != "security":
-            # Filter sensitive details for non-security users
-            explanation = self._filter_explanation_for_role(explanation, user_role)
+        # Get tool information
+        tools_used = list(self.tool_usage.keys())
+        data_sources = [source["source"] for source in self.data_sources]
         
-        return explanation
+        if tools_used and data_sources:
+            tool_name = tools_used[0]  # Primary tool used
+            source_name = data_sources[0]  # Primary data source
+            
+            tool_display = {
+                "policy_search": "Policy Search tool",
+                "log_query": "Log Query tool", 
+                "web_search": "Web Search tool"
+            }.get(tool_name, tool_name)
+            
+            return f"Response generated using {tool_display} based on {source_name}."
+        elif tools_used:
+            tool_name = tools_used[0]
+            tool_display = {
+                "policy_search": "Policy Search tool",
+                "log_query": "Log Query tool",
+                "web_search": "Web Search tool" 
+            }.get(tool_name, tool_name)
+            return f"Response generated using {tool_display}."
+        else:
+            return "Response generated using general AI knowledge."
     
     def _get_security_analysis(self) -> Dict[str, Any]:
         """Get security analysis summary"""
@@ -583,8 +599,7 @@ class SecurityDecisionTracker:
         
         return explanation
 
-# Global transparency tracker
-transparency_tracker = SecurityDecisionTracker()
+# Global transparency tracker will be initialized in startup
 
 def log_audit_entry(user_role: str, action: str, query: str, tool_used: str = None, result: str = "", trace_id: str = None):
     """Log action for audit purposes with DLP masking and LangSmith integration"""
@@ -854,7 +869,10 @@ class LogQueryTool(BaseTool):
     @traceable(name="log_query_tool")
     def _run(self, query: str, user_role: str = "sales") -> str:
         """Query security logs with role-based filtering"""
+        global transparency_tracker
         try:
+            transparency_tracker.add_tool_usage("log_query", f"User requested log analysis: '{query[:50]}...'")
+            
             # Load logs
             log_file = LOGS_DIR / "security_logs.csv"
             if not log_file.exists():
@@ -892,7 +910,13 @@ class LogQueryTool(BaseTool):
             filtered_df = filtered_df.head(10)
             
             if filtered_df.empty:
+                transparency_tracker.add_tool_usage("log_query", "No matching log entries found", confidence=0.0, results_count=0)
                 return "No matching log entries found for your query."
+            
+            # Add transparency tracking for successful search
+            transparency_tracker.add_tool_usage("log_query", f"Found {len(filtered_df)} security log entries", confidence=0.9, results_count=len(filtered_df))
+            transparency_tracker.add_data_source("security_logs.csv", "high", f"role-filtered ({user_role})")
+            transparency_tracker.add_access_decision("security_logs.csv", True, f"Log access granted to {user_role} role")
             
             # Format response
             response = f"Found {len(filtered_df)} log entries:\n\n"
@@ -930,7 +954,10 @@ class WebSearchTool(BaseTool):
     @traceable(name="web_search_tool")
     def _run(self, query: str, user_role: str = "security") -> str:
         """Search the web for real-time information on any topic"""
+        global transparency_tracker
         try:
+            transparency_tracker.add_tool_usage("web_search", f"User requested web search: '{query[:50]}...'")
+            
             # Web search is now available to both Security and Sales teams
             if user_role not in ["security", "sales"]:
                 return "Web search is only available to Security and Sales team members. Please contact your administrator for access."
@@ -960,7 +987,14 @@ class WebSearchTool(BaseTool):
             search_results = tavily_search.invoke({"query": enhanced_query})
             
             if not search_results or "results" not in search_results:
+                transparency_tracker.add_tool_usage("web_search", "No search results found", confidence=0.0, results_count=0)
                 return "No search results found for your query. Try rephrasing or being more specific."
+            
+            # Add transparency tracking for successful search
+            results_count = len(search_results.get("results", []))
+            transparency_tracker.add_tool_usage("web_search", f"Found {results_count} web search results", confidence=0.8, results_count=results_count)
+            transparency_tracker.add_data_source("Tavily Web Search", "real-time", "public web sources")
+            transparency_tracker.add_access_decision("web_search", True, f"Web search enabled for {user_role} role")
             
             # Format the response
             response = "**🔍 Web Search Results:**\n\n"
@@ -985,10 +1019,10 @@ class WebSearchTool(BaseTool):
             # Log the search
             log_audit_entry(
                 user_role=user_role,
-                action="threat_intelligence_search",
+                action="web_search",
                 query=query,
-                tool_used="threat_intelligence", 
-                result=f"Found {len(results)} threat intelligence sources"
+                tool_used="web_search", 
+                result=f"Found {len(results)} web search results"
             )
             
             response += "\n**⚠️ Security Note:** Always verify threat intelligence from multiple sources and consult your incident response procedures for any confirmed threats."
@@ -1042,9 +1076,13 @@ def create_security_agent(web_search_enabled: bool = True):
 @app.on_event("startup")
 async def startup_event():
     """Initialize the application on startup"""
+    global transparency_tracker
     logger.info("Starting Security Assistant API...")
     
     try:
+        # Initialize transparency tracker
+        transparency_tracker = SecurityDecisionTracker()
+        
         # Load RBAC configuration
         load_rbac_config()
         
