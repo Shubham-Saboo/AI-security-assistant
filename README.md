@@ -1,6 +1,7 @@
 # 🛡️ AI Security Assistant
 
 > **Enterprise-grade AI-powered security assistant with agentic capabilities, comprehensive audit logging, and advanced observability.**
+> https://www.loom.com/share/444a8ace9d26404b8a2614528757a372?sid=1141c83c-6bc4-4346-b8e2-a976949a365f
 
 ## 🎯 Overview
 
